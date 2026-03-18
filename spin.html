@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OBS Roulette</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: transparent;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh; overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    .scale-wrap {
+      width: 380px; opacity: 0;
+      transition: opacity 0.4s; margin-bottom: 20px;
+    }
+    .scale-wrap.visible { opacity: 1; }
+    .scale-label {
+      color: #ccc; font-size: 15px;
+      text-align: center; margin-bottom: 6px;
+      text-shadow: 0 0 8px rgba(0,0,0,0.8);
+      letter-spacing: 2px;
+    }
+    .scale-bar-bg {
+      width: 100%; height: 14px; background: rgba(0,0,0,0.5);
+      border-radius: 7px; overflow: hidden; border: 1px solid #555;
+    }
+    .scale-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7b4fa6, #b07fd4);
+      border-radius: 7px; transition: width 0.6s ease;
+    }
+
+    .wheel-outer {
+      position: relative;
+      width: 460px; height: 460px;
+      opacity: 0; transform: scale(0.8);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .wheel-outer.visible { opacity: 1; transform: scale(1); }
+
+    /* Дымовой эффект */
+    .smoke {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 500px; height: 500px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, transparent 40%, rgba(80,60,100,0.25) 65%, rgba(40,30,60,0.5) 80%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+      animation: smokeAnim 4s ease-in-out infinite alternate;
+    }
+    @keyframes smokeAnim {
+      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+      100% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+    }
+
+    /* Металлическая рамка */
+    .wheel-frame {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 436px; height: 436px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: conic-gradient(
+        #888 0deg, #ccc 30deg, #555 60deg, #aaa 90deg,
+        #666 120deg, #bbb 150deg, #444 180deg, #999 210deg,
+        #777 240deg, #ddd 270deg, #555 300deg, #aaa 330deg, #888 360deg
+      );
+      box-shadow:
+        0 0 0 3px #333,
+        0 0 20px rgba(0,0,0,0.8),
+        inset 0 0 10px rgba(0,0,0,0.5);
+      z-index: 1;
+    }
+
+    canvas {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      z-index: 2;
+    }
+
+    /* Центральный болт */
+    .center-bolt {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 36px; height: 36px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ddd, #888 50%, #444);
+      box-shadow: 0 0 8px rgba(0,0,0,0.8), inset 0 0 4px rgba(255,255,255,0.3);
+      z-index: 4;
+    }
+
+    /* Металлическая стрелка */
+    .arrow-wrap {
+      position: absolute;
+      top: -8px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8));
+    }
+    .arrow-wrap svg {
+      width: 36px; height: 52px;
+    }
+
+    /* Декоративные шипы по краям */
+    .spike {
+      position: absolute;
+      width: 16px; height: 16px;
+      background: radial-gradient(circle at 35% 35%, #ccc, #666);
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(0,0,0,0.6);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body>
+
+<div class="scale-wrap" id="scaleWrap">
+  <div class="scale-label" id="scaleLabel">0 / 150 ₴</div>
+  <div class="scale-bar-bg">
+    <div class="scale-bar-fill" id="scaleFill" style="width:0%"></div>
+  </div>
+</div>
+
+<div class="wheel-outer" id="wheelWrap">
+  <div class="smoke"></div>
+  <div class="wheel-frame"></div>
+
+  <canvas id="wheel" width="410" height="410"></canvas>
+
+  <div class="center-bolt"></div>
+
+  <!-- Металлическая стрелка -->
+  <div class="arrow-wrap">
+    <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#666"/>
+          <stop offset="30%" style="stop-color:#ddd"/>
+          <stop offset="60%" style="stop-color:#aaa"/>
+          <stop offset="100%" style="stop-color:#555"/>
+        </linearGradient>
+      </defs>
+      <polygon points="18,52 0,4 36,4" fill="url(#metalGrad)"/>
+      <polygon points="18,52 2,6 34,6" fill="none" stroke="#333" stroke-width="1"/>
+      <rect x="6" y="0" width="24" height="8" rx="2" fill="url(#metalGrad)" stroke="#333" stroke-width="1"/>
+    </svg>
+  </div>
+
+  <!-- Декоративные точки по кругу -->
+  <div class="spike" style="top:6px;left:50%;transform:translateX(-50%) translateX(-160px)"></div>
+  <div class="spike" style="top:6px;left:50%;transform:translateX(-50%) translateX(160px)"></div>
+  <div class="spike" style="bottom:6px;left:50%;transform:translateX(-50%) translateX(-160px)"></div>
+  <div class="spike" style="bottom:6px;left:50%;transform:translateX(-50%) translateX(160px)"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+  authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
+  databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+  projectId: "roulette-twitch-2c7a3"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// Фиолетово-серая палитра
+const colors = [
+  "#6a3d8f", "#8b5bb1", "#4a2d6e", "#9d7abf",
+  "#7a5a9e", "#5c3d7a", "#b09ad0", "#3d2459"
+];
+
+let options = [];
+let goal = 150;
+
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+const wheelWrap = document.getElementById("wheelWrap");
+const scaleWrap = document.getElementById("scaleWrap");
+const scaleLabel = document.getElementById("scaleLabel");
+const scaleFill = document.getElementById("scaleFill");
+
+let currentAngle = 0;
+let isSpinning = false;
+let hideTimer = null;
+
+db.ref("options").on("value", snap => {
+  if (snap.val()) {
+    options = snap.val();
+    drawWheel(currentAngle);
+  }
+});
+
+db.ref("goal").on("value", snap => {
+  if (snap.val()) goal = snap.val();
+});
+
+function getArcs() {
+  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
+  return options.map(o => ((o.weight || 1) / total) * 2 * Math.PI);
+}
+
+function drawWheel(angle) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const radius = cx - 5;
+  const arcs = getArcs();
+  let startA = angle;
+
+  for (let i = 0; i < options.length; i++) {
+    const endA = startA + arcs[i];
+
+    // Сектор
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startA, endA);
+    ctx.closePath();
+
+    // Градиент на каждый сектор
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    grad.addColorStop(0, lighten(colors[i % colors.length], 40));
+    grad.addColorStop(1, colors[i % colors.length]);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Текст
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(startA + arcs[i] / 2);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.font = "bold 16px Arial";
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 6;
+    ctx.fillText(options[i].label, radius - 16, 6);
+    ctx.restore();
+
+    startA = endA;
+  }
+}
+
+function lighten(hex, amount) {
+  const num = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (num >> 16) + amount);
+  const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+  const b = Math.min(255, (num & 0xff) + amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+function spinTo(index) {
+  if (isSpinning) return;
+  isSpinning = true;
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+
+  const arcs = getArcs();
+  let sectorStart = 0;
+  for (let i = 0; i < index; i++) sectorStart += arcs[i];
+  const sectorMid = sectorStart + arcs[index] / 2;
+
+  const target = (Math.PI / 2) - sectorMid + Math.PI;
+  const normalizedCurrent = currentAngle % (2 * Math.PI);
+  let diff = target - normalizedCurrent;
+  while (diff < 0) diff += 2 * Math.PI;
+  while (diff > 2 * Math.PI) diff -= 2 * Math.PI;
+
+  const extraSpins = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
+  const finalAngle = currentAngle + diff + extraSpins;
+  const duration = 4500;
+  const start = performance.now();
+  const startAngle = currentAngle;
+
+  function animate(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 4);
+    currentAngle = startAngle + (finalAngle - startAngle) * ease;
+    drawWheel(currentAngle);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      isSpinning = false;
+      db.ref("history").push({ value: options[index].label, time: Date.now() });
+      hideTimer = setTimeout(() => {
+        wheelWrap.classList.remove("visible");
+      }, 6000);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+drawWheel(0);
+
+let lastTs = 0;
+db.ref("spinCommand").on("value", snap => {
+  const data = snap.val();
+  if (!data || data.ts === lastTs) return;
+  lastTs = data.ts;
+  const index = options.findIndex(o => o.label === data.label);
+  if (index !== -1) {
+    setTimeout(() => {
+      wheelWrap.classList.add("visible");
+      spinTo(index);
+    }, 3000);
+  }
+});
+
+db.ref("donateTotal").on("value", snap => {
+  const total = snap.val() || 0;
+  const pct = Math.min((total / goal) * 100, 100);
+  scaleFill.style.width = pct + "%";
+  scaleLabel.innerText = `${total} / ${goal} ₴`;
+  scaleWrap.classList.add("visible");
+});
+</script>
+</body>
+</html>
