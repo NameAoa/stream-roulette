@@ -154,17 +154,25 @@ function spinTo(index) {
 
   const arcs = getArcs();
 
-  // Считаем середину нужного сектора
-  let midAngle = 0;
-  for (let i = 0; i < index; i++) midAngle += arcs[i];
-  midAngle += arcs[index] / 2;
+  // Начало сектора
+  let sectorStart = 0;
+  for (let i = 0; i < index; i++) sectorStart += arcs[i];
+  
+  // Середина сектора
+  const sectorMid = sectorStart + arcs[index] / 2;
 
-  // Стрелка вверху = -PI/2. Нужный сектор должен быть там.
-  const target = -midAngle + Math.PI / 2;
+  // Стрелка смотрит вниз сверху = угол -PI/2 от начала отсчёта canvas
+  // Нам нужно чтобы sectorMid оказался под стрелкой
+  // target = угол поворота колеса при котором sectorMid окажется сверху
+  const target = (3 * Math.PI / 2) - sectorMid;
 
-  // Нормализуем разницу чтобы всегда крутилось вперёд
-  let diff = target - (currentAngle % (2 * Math.PI));
-  if (diff < 0) diff += 2 * Math.PI;
+  // Нормализуем currentAngle
+  const normalizedCurrent = currentAngle % (2 * Math.PI);
+  
+  // Считаем разницу — всегда крутим вперёд
+  let diff = target - normalizedCurrent;
+  while (diff < 0) diff += 2 * Math.PI;
+  while (diff > 2 * Math.PI) diff -= 2 * Math.PI;
 
   const extraSpins = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
   const finalAngle = currentAngle + diff + extraSpins;
@@ -184,7 +192,7 @@ function spinTo(index) {
       requestAnimationFrame(animate);
     } else {
       isSpinning = false;
-        hideTimer = setTimeout(() => {
+      hideTimer = setTimeout(() => {
         wheelWrap.classList.remove("visible");
       }, 6000);
     }
