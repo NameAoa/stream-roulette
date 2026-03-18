@@ -42,7 +42,6 @@
       transform: translateX(-50%); font-size: 44px;
       filter: drop-shadow(0 0 8px gold); z-index: 10;
     }
-    
   </style>
 </head>
 <body>
@@ -59,15 +58,14 @@
   <canvas id="wheel" width="420" height="420"></canvas>
 </div>
 
-
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
 const firebaseConfig = {
-    apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
-    authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
-    databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "roulette-twitch-2c7a3"
+  apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+  authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
+  databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+  projectId: "roulette-twitch-2c7a3"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -75,12 +73,11 @@ const db = firebase.database();
 const colors = ["#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6","#e67e22","#1abc9c","#e91e63"];
 
 let options = [];
-
 let goal = 150;
+
 const canvas = document.getElementById("wheel");
 const ctx = canvas.getContext("2d");
 const wheelWrap = document.getElementById("wheelWrap");
-const resultDiv = document.createElement("div");
 const scaleWrap = document.getElementById("scaleWrap");
 const scaleLabel = document.getElementById("scaleLabel");
 const scaleFill = document.getElementById("scaleFill");
@@ -89,7 +86,6 @@ let currentAngle = 0;
 let isSpinning = false;
 let hideTimer = null;
 
-// ====== ЗАГРУЗКА ЛОТОВ ======
 db.ref("options").on("value", snap => {
   if (snap.val()) {
     options = snap.val();
@@ -149,27 +145,15 @@ function spinTo(index) {
   isSpinning = true;
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
 
-  wheelWrap.classList.add("visible");
-  scaleWrap.classList.add("visible");
-
   const arcs = getArcs();
 
-  // Начало сектора
   let sectorStart = 0;
   for (let i = 0; i < index; i++) sectorStart += arcs[i];
-  
-  // Середина сектора
   const sectorMid = sectorStart + arcs[index] / 2;
 
-  // Стрелка смотрит вниз сверху = угол -PI/2 от начала отсчёта canvas
-  // Нам нужно чтобы sectorMid оказался под стрелкой
-  // target = угол поворота колеса при котором sectorMid окажется сверху
-const target = (Math.PI / 2) - sectorMid + Math.PI;
+  const target = (Math.PI / 2) - sectorMid + Math.PI;
 
-  // Нормализуем currentAngle
   const normalizedCurrent = currentAngle % (2 * Math.PI);
-  
-  // Считаем разницу — всегда крутим вперёд
   let diff = target - normalizedCurrent;
   while (diff < 0) diff += 2 * Math.PI;
   while (diff > 2 * Math.PI) diff -= 2 * Math.PI;
@@ -191,12 +175,13 @@ const target = (Math.PI / 2) - sectorMid + Math.PI;
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
-  isSpinning = false;
-  // Пишем в историю ПОСЛЕ остановки — гарантированное совпадение
-  db.ref("history").push({ value: options[index].label, time: Date.now() });
-  hideTimer = setTimeout(() => {
-  }, 6000);
-}
+      isSpinning = false;
+      db.ref("history").push({ value: options[index].label, time: Date.now() });
+      hideTimer = setTimeout(() => {
+        wheelWrap.classList.remove("visible");
+        scaleWrap.classList.remove("visible");
+      }, 6000);
+    }
   }
   requestAnimationFrame(animate);
 }
@@ -218,7 +203,6 @@ db.ref("spinCommand").on("value", snap => {
   }
 });
 
-// ====== ШКАЛА ======
 db.ref("donateTotal").on("value", snap => {
   const total = snap.val() || 0;
   const pct = Math.min((total / goal) * 100, 100);
