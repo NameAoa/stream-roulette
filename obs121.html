@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OBS Roulette</title>
+  <style>
+    body {
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    .wheel-container {
+      position: relative;
+      width: 400px;
+      height: 400px;
+    }
+
+    canvas {
+      border-radius: 50%;
+      box-shadow: 0 0 30px rgba(255, 200, 0, 0.6);
+    }
+
+    .arrow {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 40px;
+      filter: drop-shadow(0 0 6px gold);
+    }
+
+    #result {
+      margin-top: 20px;
+      font-size: 36px;
+      color: white;
+      font-weight: bold;
+      text-shadow: 0 0 15px gold;
+      min-height: 50px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="wheel-container">
+  <div class="arrow">▼</div>
+  <canvas id="wheel" width="400" height="400"></canvas>
+</div>
+
+<div id="result">Ждём...</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+  // ====== FIREBASE CONFIG — ВСТАВЬ СВОЙ ======
+  const firebaseConfig = {
+    apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+    authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
+    databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "roulette-twitch-2c7a3"
+  };
+  // ===========================================
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // ====== ВАРИАНТЫ (должны совпадать с mobile.html) ======
+  const options = [
+    "100₴",
+    "Спеть",
+    "Відтискання",
+    "Нічого",
+    "Станцювати"
+  ];
+
+  const colors = [
+    "#e74c3c", "#3498db", "#2ecc71",
+    "#f39c12", "#9b59b6"
+  ];
+
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+  const resultDiv = document.getElementById("result");
+
+  const numSegments = options.length;
+  const arc = (2 * Math.PI) / numSegments;
+
+  let currentAngle = 0;
+  let isSpinning = false;
+
+  function drawWheel(angle) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = cx - 5;
+
+    for (let i = 0; i < numSegments; i++) {
+      const startAngle = angle + i * arc;
+      const endAngle = startAngle + arc;
+
+      // Сектор
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Текст
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(startAngle + arc / 2);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 18px Arial";
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 4;
+      ctx.fillText(options[i], radius - 15, 6);
+      ctx.restore();
+    }
+
+    // Центральный круг
+    ctx.beginPath();
+    ctx.arc(cx, cy, 20, 0, 2 * Math.PI);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  }
+
+  function spinTo(targetIndex) {
+    if (isSpinning) return;
+    isSpinning = true;
+    resultDiv.innerText = "";
+
+    // Сколько оборотов + угол до нужного сектора
+    const targetAngle = -(targetIndex * arc + arc / 2) + Math.PI / 2;
+    const extraSpins = (5 + Math.floor(Math.random() * 5)) * 2 * Math.PI;
+    const finalAngle = targetAngle + extraSpins;
+
+    const duration = 4000;
+    const start = performance.now();
+    const startAngle = currentAngle;
+
+    function animate(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Easing — замедление в конце
+      const ease = 1 - Math.pow(1 - progress, 4);
+      currentAngle = startAngle + (finalAngle - startAngle) * ease;
+
+      drawWheel(currentAngle);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        isSpinning = false;
+        resultDiv.innerText = "🎉 " + options[targetIndex];
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  // Начальная отрисовка
+  drawWheel(0);
+
+  // Слушаем Firebase
+  db.ref("currentSpin").on("value", (snapshot) => {
+    const value = snapshot.val();
+    if (value) {
+      const index = options.indexOf(value);
+      if (index !== -1) {
+        spinTo(index);
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

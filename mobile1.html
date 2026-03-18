@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Mobile Control</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #111;
+      color: white;
+    }
+    button {
+      font-size: 24px;
+      padding: 20px;
+      margin: 20px;
+    }
+    #history {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>📱 ПУЛЬТ</h1>
+<button onclick="spin()">КРУТИТЬ</button>
+
+<h2>История:</h2>
+<ul id="history"></ul>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+    authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
+    databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "roulette-twitch-2c7a3"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const options = [
+  "100₴",
+  "Спеть",
+  "Відтискання",
+  "Нічого",
+  "Станцювати"
+];
+
+  function spin() {
+    const result = options[Math.floor(Math.random() * options.length)];
+    
+    db.ref("currentSpin").set(result);
+    db.ref("history").push(result);
+  }
+
+  const historyList = document.getElementById("history");
+
+  db.ref("history").on("value", (snapshot) => {
+    historyList.innerHTML = "";
+    const data = snapshot.val();
+    if (data) {
+      Object.values(data).reverse().forEach(item => {
+        const li = document.createElement("li");
+        li.innerText = item;
+        historyList.appendChild(li);
+      });
+    }
+  });
+</script>
+
+</body>
+</html>
