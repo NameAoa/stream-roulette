@@ -10,114 +10,43 @@
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       height: 100vh; overflow: hidden;
-      font-family: Arial, sans-serif;
     }
     .scale-wrap {
       width: 380px; opacity: 0;
-      transition: opacity 0.4s; margin-bottom: 20px;
+      transition: opacity 0.4s; margin-bottom: 12px;
     }
     .scale-wrap.visible { opacity: 1; }
     .scale-label {
-      color: #ccc; font-size: 15px;
+      color: #ccc; font-size: 15px; font-family: Arial;
       text-align: center; margin-bottom: 6px;
       text-shadow: 0 0 8px rgba(0,0,0,0.8);
-      letter-spacing: 2px;
     }
     .scale-bar-bg {
       width: 100%; height: 14px; background: rgba(0,0,0,0.5);
-      border-radius: 7px; overflow: hidden; border: 1px solid #555;
+      border-radius: 7px; overflow: hidden; border: 1px solid #444;
     }
     .scale-bar-fill {
       height: 100%;
       background: linear-gradient(90deg, #7b4fa6, #b07fd4);
       border-radius: 7px; transition: width 0.6s ease;
     }
-
-    .wheel-outer {
-      position: relative;
-      width: 460px; height: 460px;
+    .wheel-wrap {
+      position: relative; width: 420px; height: 420px;
       opacity: 0; transform: scale(0.8);
       transition: opacity 0.5s ease, transform 0.5s ease;
     }
-    .wheel-outer.visible { opacity: 1; transform: scale(1); }
-
-    /* Дымовой эффект */
-    .smoke {
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 500px; height: 500px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: radial-gradient(circle, transparent 40%, rgba(80,60,100,0.25) 65%, rgba(40,30,60,0.5) 80%, transparent 100%);
-      pointer-events: none;
-      z-index: 0;
-      animation: smokeAnim 4s ease-in-out infinite alternate;
-    }
-    @keyframes smokeAnim {
-      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
-      100% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
-    }
-
-    /* Металлическая рамка */
-    .wheel-frame {
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 436px; height: 436px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: conic-gradient(
-        #888 0deg, #ccc 30deg, #555 60deg, #aaa 90deg,
-        #666 120deg, #bbb 150deg, #444 180deg, #999 210deg,
-        #777 240deg, #ddd 270deg, #555 300deg, #aaa 330deg, #888 360deg
-      );
-      box-shadow:
-        0 0 0 3px #333,
-        0 0 20px rgba(0,0,0,0.8),
-        inset 0 0 10px rgba(0,0,0,0.5);
-      z-index: 1;
-    }
-
+    .wheel-wrap.visible { opacity: 1; transform: scale(1); }
     canvas {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
       border-radius: 50%;
-      z-index: 2;
+      box-shadow: 0 0 40px rgba(140,80,200,0.6);
     }
-
-    /* Центральный болт */
-    .center-bolt {
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 36px; height: 36px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #ddd, #888 50%, #444);
-      box-shadow: 0 0 8px rgba(0,0,0,0.8), inset 0 0 4px rgba(255,255,255,0.3);
-      z-index: 4;
-    }
-
-    /* Металлическая стрелка */
     .arrow-wrap {
-      position: absolute;
-      top: -8px; left: 50%;
+      position: absolute; top: -18px; left: 50%;
       transform: translateX(-50%);
-      z-index: 5;
+      z-index: 10;
       filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8));
     }
-    .arrow-wrap svg {
-      width: 36px; height: 52px;
-    }
-
-    /* Декоративные шипы по краям */
-    .spike {
-      position: absolute;
-      width: 16px; height: 16px;
-      background: radial-gradient(circle at 35% 35%, #ccc, #666);
-      border-radius: 50%;
-      box-shadow: 0 0 4px rgba(0,0,0,0.6);
-      z-index: 3;
-    }
+    .arrow-wrap svg { width: 36px; height: 52px; }
   </style>
 </head>
 <body>
@@ -129,15 +58,7 @@
   </div>
 </div>
 
-<div class="wheel-outer" id="wheelWrap">
-  <div class="smoke"></div>
-  <div class="wheel-frame"></div>
-
-  <canvas id="wheel" width="410" height="410"></canvas>
-
-  <div class="center-bolt"></div>
-
-  <!-- Металлическая стрелка -->
+<div class="wheel-wrap" id="wheelWrap">
   <div class="arrow-wrap">
     <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -149,16 +70,10 @@
         </linearGradient>
       </defs>
       <polygon points="18,52 0,4 36,4" fill="url(#metalGrad)"/>
-      <polygon points="18,52 2,6 34,6" fill="none" stroke="#333" stroke-width="1"/>
       <rect x="6" y="0" width="24" height="8" rx="2" fill="url(#metalGrad)" stroke="#333" stroke-width="1"/>
     </svg>
   </div>
-
-  <!-- Декоративные точки по кругу -->
-  <div class="spike" style="top:6px;left:50%;transform:translateX(-50%) translateX(-160px)"></div>
-  <div class="spike" style="top:6px;left:50%;transform:translateX(-50%) translateX(160px)"></div>
-  <div class="spike" style="bottom:6px;left:50%;transform:translateX(-50%) translateX(-160px)"></div>
-  <div class="spike" style="bottom:6px;left:50%;transform:translateX(-50%) translateX(160px)"></div>
+  <canvas id="wheel" width="420" height="420"></canvas>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -173,10 +88,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Фиолетово-серая палитра
+// Градация фиолетового
 const colors = [
-  "#6a3d8f", "#8b5bb1", "#4a2d6e", "#9d7abf",
-  "#7a5a9e", "#5c3d7a", "#b09ad0", "#3d2459"
+  "#3d1a6e", "#5a2d91", "#7b4fa6", "#9d6dbf",
+  "#4a2278", "#6b3d9e", "#8c5ab5", "#b07fd4"
 ];
 
 let options = [];
@@ -219,20 +134,20 @@ function drawWheel(angle) {
   for (let i = 0; i < options.length; i++) {
     const endA = startA + arcs[i];
 
-    // Сектор
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, radius, startA, endA);
     ctx.closePath();
 
-    // Градиент на каждый сектор
+    // Радиальный градиент на сектор
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-    grad.addColorStop(0, lighten(colors[i % colors.length], 40));
-    grad.addColorStop(1, colors[i % colors.length]);
+    const base = colors[i % colors.length];
+    grad.addColorStop(0, lighten(base, 50));
+    grad.addColorStop(1, base);
     ctx.fillStyle = grad;
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     // Текст
@@ -240,15 +155,27 @@ function drawWheel(angle) {
     ctx.translate(cx, cy);
     ctx.rotate(startA + arcs[i] / 2);
     ctx.textAlign = "right";
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.font = "bold 16px Arial";
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 17px Arial";
     ctx.shadowColor = "rgba(0,0,0,0.8)";
-    ctx.shadowBlur = 6;
-    ctx.fillText(options[i].label, radius - 16, 6);
+    ctx.shadowBlur = 5;
+    ctx.fillText(options[i].label, radius - 14, 6);
     ctx.restore();
 
     startA = endA;
   }
+
+  // Центральный круг
+  const centerGrad = ctx.createRadialGradient(cx-5, cy-5, 0, cx, cy, 22);
+  centerGrad.addColorStop(0, "#ddd");
+  centerGrad.addColorStop(1, "#666");
+  ctx.beginPath();
+  ctx.arc(cx, cy, 22, 0, 2 * Math.PI);
+  ctx.fillStyle = centerGrad;
+  ctx.fill();
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }
 
 function lighten(hex, amount) {
