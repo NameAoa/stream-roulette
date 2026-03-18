@@ -195,7 +195,16 @@ function spinTo(index) {
       requestAnimationFrame(animate);
     } else {
       isSpinning = false;
-      db.ref("history").push({ value: options[index].label, time: Date.now() });
+      db.ref("history").push({ value: options[index].label, time: Date.now() }).then(() => {
+  db.ref("history").orderByChild("time").once("value", snap => {
+    const data = snap.val();
+    if (!data) return;
+    const keys = Object.keys(data);
+    if (keys.length > 20) {
+      keys.slice(0, keys.length - 20).forEach(k => db.ref("history/" + k).remove());
+    }
+  });
+});
       hideTimer = setTimeout(() => {
         wheelWrap.classList.remove("visible");
       }, 6000);
