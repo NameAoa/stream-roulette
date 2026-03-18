@@ -164,7 +164,7 @@ function spinTo(index) {
   // Стрелка смотрит вниз сверху = угол -PI/2 от начала отсчёта canvas
   // Нам нужно чтобы sectorMid оказался под стрелкой
   // target = угол поворота колеса при котором sectorMid окажется сверху
-  const target = (Math.PI / 2) - sectorMid + Math.PI;
+const target = (Math.PI / 2) - sectorMid + Math.PI;
 
   // Нормализуем currentAngle
   const normalizedCurrent = currentAngle % (2 * Math.PI);
@@ -191,11 +191,13 @@ function spinTo(index) {
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
-      isSpinning = false;
-      hideTimer = setTimeout(() => {
-        wheelWrap.classList.remove("visible");
-      }, 6000);
-    }
+  isSpinning = false;
+  // Пишем в историю ПОСЛЕ остановки — гарантированное совпадение
+  db.ref("history").push({ value: options[index].label, time: Date.now() });
+  hideTimer = setTimeout(() => {
+    wheelWrap.classList.remove("visible");
+  }, 6000);
+}
   }
   requestAnimationFrame(animate);
 }
