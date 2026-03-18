@@ -210,10 +210,10 @@ db.ref("spinCommand").on("value", snap => {
   const data = snap.val();
   if (!data || data.ts === lastTs) return;
   lastTs = data.ts;
-  
-  // Ищем по названию, а не по индексу
   const index = options.findIndex(o => o.label === data.label);
-  if (index !== -1) spinTo(index);
+  if (index !== -1) {
+    setTimeout(() => spinTo(index), 6000); // 3 секунды задержки
+  }
 });
 
 // ====== ШКАЛА ======
