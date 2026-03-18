@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎰 Пульт</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f0f1a;
+      color: white;
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 20px;
+    }
+    h1 { font-size: 22px; letter-spacing: 3px; color: #f0c040; margin-bottom: 24px; }
+
+    .section {
+      width: 100%; max-width: 360px;
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+      color: #555; margin-bottom: 12px;
+    }
+
+    /* Шкала */
+    .scale-top { display: flex; justify-content: space-between; margin-bottom: 10px; }
+    .scale-total { font-size: 22px; font-weight: bold; color: #f0c040; }
+    .scale-bar-bg { width: 100%; height: 16px; background: #111; border-radius: 8px; overflow: hidden; }
+    .scale-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f0c040, #ff6b35);
+      border-radius: 8px; transition: width 0.5s;
+    }
+    .row { display: flex; gap: 8px; margin-top: 10px; }
+    .row input {
+      flex: 1; padding: 10px; border-radius: 8px;
+      border: 1px solid #333; background: #111;
+      color: white; font-size: 16px; text-align: center;
+    }
+    .btn-gold {
+      padding: 10px 14px; border-radius: 8px; border: none;
+      background: #f0c040; color: #111; font-weight: bold;
+      font-size: 14px; cursor: pointer; white-space: nowrap;
+    }
+
+    /* Кнопка спин */
+    .spin-btn {
+      width: 190px; height: 190px; border-radius: 50%;
+      border: 4px solid #f0c040;
+      background: radial-gradient(circle at 40% 35%, #f0c040, #c8860a);
+      color: #111; font-size: 20px; font-weight: bold;
+      letter-spacing: 2px; cursor: pointer;
+      box-shadow: 0 0 40px rgba(240,192,64,0.4);
+      transition: transform 0.1s; text-transform: uppercase;
+    }
+    .spin-btn:active { transform: scale(0.93); }
+    .spin-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .cooldown { margin-top: 12px; font-size: 13px; color: #666; height: 18px; }
+
+    /* Лоты */
+    .lot-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px; background: #111;
+      padding: 10px 12px; border-radius: 10px;
+    }
+    .lot-color { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .lot-name-input {
+      flex: 1; background: transparent; border: none;
+      border-bottom: 1px solid #333; color: white;
+      font-size: 14px; padding: 2px 4px;
+    }
+    .lot-weight-input {
+      width: 52px; padding: 6px; border-radius: 6px;
+      border: 1px solid #333; background: #0f0f1a;
+      color: white; font-size: 14px; text-align: center;
+    }
+    .lot-pct { font-size: 12px; color: #f0c040; width: 36px; text-align: right; }
+    .lot-del {
+      background: none; border: none; color: #555;
+      font-size: 18px; cursor: pointer; padding: 0 4px;
+    }
+    .lot-del:hover { color: #e74c3c; }
+    .btn-add {
+      width: 100%; padding: 12px; margin-top: 6px;
+      border: 2px dashed #333; border-radius: 10px;
+      background: transparent; color: #555;
+      font-size: 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-add:hover { border-color: #f0c040; color: #f0c040; }
+    .btn-save {
+      width: 100%; padding: 13px; margin-top: 8px;
+      border: none; border-radius: 10px;
+      background: #f0c040; color: #111;
+      font-size: 16px; font-weight: bold; cursor: pointer;
+    }
+
+    /* История */
+    .history-item {
+      background: #111; border-left: 3px solid #f0c040;
+      padding: 10px 14px; margin-bottom: 8px;
+      border-radius: 0 8px 8px 0;
+      display: flex; justify-content: space-between;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🎰 РУЛЕТКА</h1>
+
+<!-- Шкала -->
+<div class="section">
+  <div class="section-title">Шкала донатів</div>
+  <div class="scale-top">
+    <span style="color:#aaa;font-size:13px">Зібрано</span>
+    <span class="scale-total"><span id="totalVal">0</span> / <span id="goalVal">150</span> ₴</span>
+  </div>
+  <div class="scale-bar-bg">
+    <div class="scale-bar-fill" id="scaleFill" style="width:0%"></div>
+  </div>
+  <div class="row">
+    <input type="number" id="addAmount" placeholder="+ Сума ₴" min="0">
+    <button class="btn-gold" onclick="addDonate()">Додати</button>
+    <button class="btn-gold" style="background:#e74c3c" onclick="resetDonate()">✕</button>
+  </div>
+  <div class="row">
+    <input type="number" id="goalInput" placeholder="Ціль (150)" min="1">
+    <button class="btn-gold" onclick="setGoal()">Змінити ціль</button>
+  </div>
+</div>
+
+<!-- Спин -->
+<button class="spin-btn" id="spinBtn" onclick="manualSpin()">КРУТИТИ</button>
+<div class="cooldown" id="cooldown"></div>
+
+<!-- Лоты -->
+<div class="section" style="margin-top:24px">
+  <div class="section-title">Лоти та шанси</div>
+  <div id="lotsList"></div>
+  <button class="btn-add" onclick="addLot()">+ Додати лот</button>
+  <button class="btn-save" onclick="saveLots()">💾 Зберегти</button>
+</div>
+
+<!-- История -->
+<div class="section">
+  <div class="section-title">Історія</div>
+  <ul id="history" style="list-style:none;"></ul>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+// ====== FIREBASE CONFIG ======
+const firebaseConfig = {
+    apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+    authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
+    databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "roulette-twitch-2c7a3"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const colors = ["#e74c3c","#3498db","#2ecc71","#f39c12","#9b59b6","#e67e22","#1abc9c","#e91e63"];
+
+let options = [];
+
+let goal = 150;
+let currentTotal = 0;
+let onCooldown = false;
+let autoSpinQueue = 0; // сколько автоспинов в очереди
+
+// ====== ЗАГРУЗКА ИЗ FIREBASE ======
+db.ref("options").on("value", snap => {
+  if (snap.val()) {
+    options = snap.val();
+  }
+  renderLots();
+});
+
+db.ref("goal").once("value", snap => {
+  if (snap.val()) {
+    goal = snap.val();
+    document.getElementById("goalVal").innerText = goal;
+  }
+});
+
+// ====== ШКАЛА ======
+db.ref("donateTotal").on("value", snap => {
+  currentTotal = snap.val() || 0;
+  updateScaleUI();
+  checkAutoSpin();
+});
+
+function updateScaleUI() {
+  document.getElementById("totalVal").innerText = currentTotal;
+  const pct = Math.min((currentTotal / goal) * 100, 100);
+  document.getElementById("scaleFill").style.width = pct + "%";
+}
+
+function addDonate() {
+  const val = parseFloat(document.getElementById("addAmount").value);
+  if (!val || val <= 0) return;
+  db.ref("donateTotal").set(currentTotal + val);
+  document.getElementById("addAmount").value = "";
+}
+
+function resetDonate() {
+  if (confirm("Скинути шкалу до 0?")) db.ref("donateTotal").set(0);
+}
+
+function setGoal() {
+  const val = parseInt(document.getElementById("goalInput").value);
+  if (!val || val <= 0) return;
+  goal = val;
+  db.ref("goal").set(goal);
+  document.getElementById("goalVal").innerText = goal;
+  document.getElementById("goalInput").value = "";
+}
+
+// ====== АВТОКРУТ (ИСПРАВЛЕН) ======
+function checkAutoSpin() {
+  // Считаем сколько раз цель "переполнена"
+  if (currentTotal >= goal) {
+    const spinsNeeded = Math.floor(currentTotal / goal);
+    // Запускаем нужное количество спинов с задержкой
+    for (let i = 0; i < spinsNeeded; i++) {
+      setTimeout(() => {
+        doSpin();
+      }, i * 8000); // каждые 8 секунд следующий спин
+    }
+    // Сразу вычитаем из Firebase
+    const remainder = currentTotal % goal;
+    db.ref("donateTotal").set(remainder);
+  }
+}
+
+// ====== РАНДОМ С ВЕСАМИ ======
+function weightedRandom() {
+  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < options.length; i++) {
+    r -= options[i].weight;
+    if (r <= 0) return i;
+  }
+  return options.length - 1;
+}
+
+// ====== СПИН ======
+const btn = document.getElementById("spinBtn");
+const cooldownDiv = document.getElementById("cooldown");
+
+function manualSpin() {
+  if (onCooldown) return;
+  doSpin();
+}
+
+function doSpin() {
+  const index = weightedRandom();
+  const label = options[index].label;
+  const ts = Date.now();
+  
+  db.ref("spinCommand").set({ label, ts });
+  
+  
+  startCooldown();
+}
+
+function startCooldown() {
+  onCooldown = true;
+  btn.disabled = true;
+  let sec = 7;
+  cooldownDiv.innerText = `Зачекай ${sec}с...`;
+  const t = setInterval(() => {
+    sec--;
+    if (sec <= 0) {
+      clearInterval(t);
+      onCooldown = false;
+      btn.disabled = false;
+      cooldownDiv.innerText = "";
+    } else {
+      cooldownDiv.innerText = `Зачекай ${sec}с...`;
+    }
+  }, 1000);
+}
+
+// ====== ЛОТЫ ======
+function renderLots() {
+  const list = document.getElementById("lotsList");
+  list.innerHTML = "";
+  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
+  options.forEach((opt, i) => {
+    const pct = Math.round((opt.weight / total) * 100);
+    const div = document.createElement("div");
+    div.className = "lot-row";
+    div.innerHTML = `
+      <div class="lot-color" style="background:${colors[i % colors.length]}"></div>
+      <input class="lot-name-input" type="text" id="name_${i}" value="${opt.label}" placeholder="Назва лоту">
+      <input class="lot-weight-input" type="number" id="w_${i}" value="${opt.weight}" min="1">
+      <span class="lot-pct" id="pct_${i}">${pct}%</span>
+      <button class="lot-del" onclick="deleteLot(${i})">✕</button>
+    `;
+    list.appendChild(div);
+
+    // Живое обновление процентов при вводе
+    setTimeout(() => {
+      document.getElementById("w_" + i).addEventListener("input", updatePcts);
+    }, 0);
+  });
+}
+
+function updatePcts() {
+  const weights = options.map((_, i) => {
+    const el = document.getElementById("w_" + i);
+    return el ? (parseFloat(el.value) || 1) : 1;
+  });
+  const total = weights.reduce((s, w) => s + w, 0);
+  weights.forEach((w, i) => {
+    const el = document.getElementById("pct_" + i);
+    if (el) el.innerText = Math.round((w / total) * 100) + "%";
+  });
+}
+
+function addLot() {
+  options.push({ label: "Новий лот", weight: 10 });
+  renderLots();
+}
+
+function deleteLot(i) {
+  if (options.length <= 2) { alert("Мінімум 2 лоти!"); return; }
+  options.splice(i, 1);
+  renderLots();
+}
+
+function saveLots() {
+  const newOptions = [];
+  let valid = true;
+  options.forEach((_, i) => {
+    const nameEl = document.getElementById("name_" + i);
+    const wEl = document.getElementById("w_" + i);
+    if (!nameEl || !wEl) return;
+    const label = nameEl.value.trim();
+    const weight = parseFloat(wEl.value);
+    if (!label || !weight || weight <= 0) { valid = false; return; }
+    newOptions.push({ label, weight });
+  });
+  if (!valid) { alert("Перевір назви і ваги лотів!"); return; }
+  options = newOptions;
+  db.ref("options").set(options);
+  renderLots();
+  // Обновить колесо в OBS
+  db.ref("optionsUpdate").set({ ts: Date.now() });
+  alert("Збережено! ✅");
+}
+
+// ====== ИСТОРИЯ ======
+db.ref("history").orderByChild("time").on("value", snap => {
+  const historyList = document.getElementById("history");
+  historyList.innerHTML = "";
+  const data = snap.val();
+  if (data) {
+    const items = Object.values(data).sort((a, b) => b.time - a.time);
+    items.forEach((item, i) => {
+      const li = document.createElement("li");
+      li.className = "history-item";
+      const val = typeof item === "string" ? item : item.value;
+      li.innerHTML = `<span>${val}</span><span style="color:#555;font-size:12px">#${items.length - i}</span>`;
+      historyList.appendChild(li);
+    });
+  }
+});
+</script>
+</body>
+</html>
