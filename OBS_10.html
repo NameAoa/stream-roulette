@@ -164,7 +164,7 @@ function spinTo(index) {
   // Стрелка смотрит вниз сверху = угол -PI/2 от начала отсчёта canvas
   // Нам нужно чтобы sectorMid оказался под стрелкой
   // target = угол поворота колеса при котором sectorMid окажется сверху
-  const target = (3 * Math.PI / 2) - sectorMid;
+  const target = (Math.PI / 2) - sectorMid + Math.PI;
 
   // Нормализуем currentAngle
   const normalizedCurrent = currentAngle % (2 * Math.PI);
