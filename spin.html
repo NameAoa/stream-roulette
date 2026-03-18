@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>OBS Roulette</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -17,18 +18,11 @@
     }
     .scale-wrap.visible { opacity: 1; }
     .scale-label {
-      color: #ccc; font-size: 15px; font-family: Arial;
-      text-align: center; margin-bottom: 6px;
-      text-shadow: 0 0 8px rgba(0,0,0,0.8);
-    }
-    .scale-bar-bg {
-      width: 100%; height: 14px; background: rgba(0,0,0,0.5);
-      border-radius: 7px; overflow: hidden; border: 1px solid #444;
-    }
-    .scale-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #7b4fa6, #b07fd4);
-      border-radius: 7px; transition: width 0.6s ease;
+      color: #fff; font-size: 32px;
+      font-family: 'Poiret One', cursive;
+      text-align: center;
+      text-shadow: 0 0 12px rgba(140,80,200,0.8);
+      letter-spacing: 2px;
     }
     .wheel-wrap {
       position: relative; width: 420px; height: 420px;
@@ -52,10 +46,7 @@
 <body>
 
 <div class="scale-wrap" id="scaleWrap">
-  <div class="scale-label" id="scaleLabel">0 / 150 ₴</div>
-  <div class="scale-bar-bg">
-    <div class="scale-bar-fill" id="scaleFill" style="width:0%"></div>
-  </div>
+  <div class="scale-label" id="scaleLabel">Колесо 0/150</div>
 </div>
 
 <div class="wheel-wrap" id="wheelWrap">
@@ -88,7 +79,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Градация фиолетового
 const colors = [
   "#3d1a6e", "#5a2d91", "#7b4fa6", "#9d6dbf",
   "#4a2278", "#6b3d9e", "#8c5ab5", "#b07fd4"
@@ -139,7 +129,6 @@ function drawWheel(angle) {
     ctx.arc(cx, cy, radius, startA, endA);
     ctx.closePath();
 
-    // Радиальный градиент на сектор
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
     const base = colors[i % colors.length];
     grad.addColorStop(0, lighten(base, 50));
@@ -150,7 +139,6 @@ function drawWheel(angle) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Текст
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(startA + arcs[i] / 2);
@@ -164,18 +152,6 @@ function drawWheel(angle) {
 
     startA = endA;
   }
-
-  // Центральный круг
-  const centerGrad = ctx.createRadialGradient(cx-5, cy-5, 0, cx, cy, 22);
-  centerGrad.addColorStop(0, "#ddd");
-  centerGrad.addColorStop(1, "#666");
-  ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, 2 * Math.PI);
-  ctx.fillStyle = centerGrad;
-  ctx.fill();
-  ctx.strokeStyle = "#333";
-  ctx.lineWidth = 2;
-  ctx.stroke();
 }
 
 function lighten(hex, amount) {
@@ -247,8 +223,7 @@ db.ref("spinCommand").on("value", snap => {
 db.ref("donateTotal").on("value", snap => {
   const total = snap.val() || 0;
   const pct = Math.min((total / goal) * 100, 100);
-  scaleFill.style.width = pct + "%";
-  scaleLabel.innerText = `${total} / ${goal} ₴`;
+  scaleLabel.innerText = `Колесо ${total}/${goal}`;
   scaleWrap.classList.add("visible");
 });
 </script>
