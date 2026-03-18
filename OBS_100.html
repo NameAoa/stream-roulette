@@ -179,7 +179,6 @@ function spinTo(index) {
       db.ref("history").push({ value: options[index].label, time: Date.now() });
       hideTimer = setTimeout(() => {
         wheelWrap.classList.remove("visible");
-        scaleWrap.classList.remove("visible");
       }, 6000);
     }
   }
