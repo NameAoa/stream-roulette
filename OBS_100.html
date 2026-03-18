@@ -195,7 +195,6 @@ const target = (Math.PI / 2) - sectorMid + Math.PI;
   // Пишем в историю ПОСЛЕ остановки — гарантированное совпадение
   db.ref("history").push({ value: options[index].label, time: Date.now() });
   hideTimer = setTimeout(() => {
-    wheelWrap.classList.remove("visible");
   }, 6000);
 }
   }
@@ -204,7 +203,6 @@ const target = (Math.PI / 2) - sectorMid + Math.PI;
 
 drawWheel(0);
 
-// ====== СЛУШАЕМ СПИН ======
 let lastTs = 0;
 db.ref("spinCommand").on("value", snap => {
   const data = snap.val();
@@ -212,7 +210,11 @@ db.ref("spinCommand").on("value", snap => {
   lastTs = data.ts;
   const index = options.findIndex(o => o.label === data.label);
   if (index !== -1) {
-    setTimeout(() => spinTo(index), 6000); // 3 секунды задержки
+    setTimeout(() => {
+      wheelWrap.classList.add("visible");
+      scaleWrap.classList.add("visible");
+      spinTo(index);
+    }, 6000);
   }
 });
 
@@ -222,7 +224,6 @@ db.ref("donateTotal").on("value", snap => {
   const pct = Math.min((total / goal) * 100, 100);
   scaleFill.style.width = pct + "%";
   scaleLabel.innerText = `${total} / ${goal} ₴`;
-  scaleWrap.classList.add("visible");
 });
 </script>
 </body>
