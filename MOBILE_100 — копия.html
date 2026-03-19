@@ -229,20 +229,27 @@ function setGoal() {
   document.getElementById("goalInput").value = "";
 }
 
-// ====== АВТОКРУТ (ИСПРАВЛЕН) ======
+let autoSpinInProgress = false;
+
 function checkAutoSpin() {
-  // Считаем сколько раз цель "переполнена"
+  if (autoSpinInProgress) return;
   if (currentTotal >= goal) {
+    autoSpinInProgress = true;
     const spinsNeeded = Math.floor(currentTotal / goal);
-    // Запускаем нужное количество спинов с задержкой
+    const remainder = currentTotal % goal;
+    
+    // Спочатку списуємо суму
+    db.ref("donateTotal").set(remainder);
+    
+    // Потім крутимо потрібну кількість разів
     for (let i = 0; i < spinsNeeded; i++) {
       setTimeout(() => {
         doSpin();
-      }, i * 8000); // каждые 8 секунд следующий спин
+        if (i === spinsNeeded - 1) {
+          autoSpinInProgress = false;
+        }
+      }, i * 8000);
     }
-    // Сразу вычитаем из Firebase
-    const remainder = currentTotal % goal;
-    db.ref("donateTotal").set(remainder);
   }
 }
 
