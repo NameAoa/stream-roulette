@@ -196,11 +196,10 @@ db.ref("goal").once("value", snap => {
   }
 });
 
-// ====== ШКАЛА ======
 db.ref("donateTotal").on("value", snap => {
   currentTotal = snap.val() || 0;
   updateScaleUI();
-  checkAutoSpin();
+  // Не викликаємо checkAutoSpin тут
 });
 
 function updateScaleUI() {
@@ -212,8 +211,10 @@ function updateScaleUI() {
 function addDonate() {
   const val = parseFloat(document.getElementById("addAmount").value);
   if (!val || val <= 0) return;
-  db.ref("donateTotal").set(currentTotal + val);
+  const newTotal = currentTotal + val;
+  db.ref("donateTotal").set(newTotal);
   document.getElementById("addAmount").value = "";
+  setTimeout(() => checkAutoSpin(), 500);
 }
 
 function resetDonate() {
