@@ -41,6 +41,18 @@
       filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8));
     }
     .arrow-wrap svg { width: 36px; height: 52px; }
+    #spinResult {
+      margin-top: 16px;
+      font-size: 36px;
+      font-family: 'Poiret One', cursive;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(140,80,200,0.9);
+      letter-spacing: 3px;
+      opacity: 0;
+      transition: opacity 0.5s;
+      text-align: center;
+    }
+    #spinResult.visible { opacity: 1; }
   </style>
 </head>
 <body>
@@ -67,6 +79,8 @@
   <canvas id="wheel" width="420" height="420"></canvas>
 </div>
 
+<div id="spinResult"></div>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
@@ -92,7 +106,7 @@ const ctx = canvas.getContext("2d");
 const wheelWrap = document.getElementById("wheelWrap");
 const scaleWrap = document.getElementById("scaleWrap");
 const scaleLabel = document.getElementById("scaleLabel");
-const scaleFill = document.getElementById("scaleFill");
+const spinResult = document.getElementById("spinResult");
 
 let currentAngle = 0;
 let isSpinning = false;
@@ -195,18 +209,12 @@ function spinTo(index) {
       requestAnimationFrame(animate);
     } else {
       isSpinning = false;
-      db.ref("history").push({ value: options[index].label, time: Date.now() }).then(() => {
-  db.ref("history").orderByChild("time").once("value", snap => {
-    const data = snap.val();
-    if (!data) return;
-    const keys = Object.keys(data);
-    if (keys.length > 20) {
-      keys.slice(0, keys.length - 20).forEach(k => db.ref("history/" + k).remove());
-    }
-  });
-});
+      db.ref("history").push({ value: options[index].label, time: Date.now() });
+      spinResult.innerText = options[index].label;
+      spinResult.classList.add("visible");
       hideTimer = setTimeout(() => {
         wheelWrap.classList.remove("visible");
+        spinResult.classList.remove("visible");
       }, 6000);
     }
   }
@@ -231,7 +239,6 @@ db.ref("spinCommand").on("value", snap => {
 
 db.ref("donateTotal").on("value", snap => {
   const total = snap.val() || 0;
-  const pct = Math.min((total / goal) * 100, 100);
   scaleLabel.innerText = `Колесо ${total}/${goal}`;
   scaleWrap.classList.add("visible");
 });
