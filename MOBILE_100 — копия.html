@@ -244,9 +244,9 @@ function playBeep() {
 }
 
 function parseTimerFromLabel(label) {
-  const matchM = label.match(/(\d+)\s*(хв|мін|мин|м(?!с)|min)\b/i);
+  const matchM = label.match(/(\d+)\s*(хв|мін|мин|min)/i);
   if (matchM) return parseInt(matchM[1]) * 60;
-  const matchS = label.match(/(\d+)\s*(с|сек|sec)\b/i);
+  const matchS = label.match(/(\d+)\s*(сек|sec)/i);
   if (matchS) return parseInt(matchS[1]);
   return null;
 }
