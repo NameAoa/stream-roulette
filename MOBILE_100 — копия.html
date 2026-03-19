@@ -252,15 +252,21 @@ function parseTimerFromLabel(label) {
 }
 
 // Слухаємо spinCommand щоб запускати таймер автоматично
-let lastTimerTs = 0;
+let lastTimerTs = -1;
+let timerInitialized = false;
 db.ref("spinCommand").on("value", snap => {
   const data = snap.val();
-  if (!data || data.ts === lastTimerTs) return;
+  if (!data) return;
+  if (!timerInitialized) {
+    lastTimerTs = data.ts;
+    timerInitialized = true;
+    return;
+  }
+  if (data.ts === lastTimerTs) return;
   lastTimerTs = data.ts;
   const seconds = parseTimerFromLabel(data.label);
   if (seconds) {
     document.getElementById("timerLabel").innerText = data.label;
-    // Запускаємо таймер після того як колесо зупиниться (~8 сек)
     setTimeout(() => startTimer(seconds), 30000);
   }
 });
