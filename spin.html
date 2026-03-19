@@ -112,6 +112,9 @@ let currentAngle = 0;
 let isSpinning = false;
 let hideTimer = null;
 
+let spinQueue = [];
+let processingQueue = false;
+
 db.ref("options").on("value", snap => {
   if (snap.val()) {
     options = snap.val();
@@ -176,7 +179,7 @@ function lighten(hex, amount) {
   return `rgb(${r},${g},${b})`;
 }
 
-function spinTo(index) {
+function spinTo(index, onDone) {
   if (isSpinning) return;
   isSpinning = true;
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
@@ -215,10 +218,24 @@ function spinTo(index) {
       hideTimer = setTimeout(() => {
         wheelWrap.classList.remove("visible");
         spinResult.classList.remove("visible");
+        if (onDone) onDone();
       }, 6000);
     }
   }
   requestAnimationFrame(animate);
+}
+
+function processQueue() {
+  if (processingQueue || spinQueue.length === 0) return;
+  processingQueue = true;
+  const index = spinQueue.shift();
+  wheelWrap.classList.add("visible");
+  spinTo(index, () => {
+    processingQueue = false;
+    if (spinQueue.length > 0) {
+      setTimeout(processQueue, 500);
+    }
+  });
 }
 
 drawWheel(0);
@@ -231,9 +248,9 @@ db.ref("spinCommand").on("value", snap => {
   const index = options.findIndex(o => o.label === data.label);
   if (index !== -1) {
     setTimeout(() => {
-      wheelWrap.classList.add("visible");
-      spinTo(index);
-    }, 3000);
+      spinQueue.push(index);
+      processQueue();
+    }, isSpinning ? 0 : 3000);
   }
 });
 
