@@ -250,7 +250,7 @@ db.ref("spinCommand").on("value", snap => {
     setTimeout(() => {
       spinQueue.push(index);
       processQueue();
-    }, isSpinning ? 0 : 3000);
+    }, isSpinning ? 0 : 10000);
   }
 });
 
