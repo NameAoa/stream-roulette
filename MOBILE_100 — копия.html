@@ -196,10 +196,21 @@ db.ref("goal").once("value", snap => {
   }
 });
 
+let prevTotal = 0;
+
 db.ref("donateTotal").on("value", snap => {
-  currentTotal = snap.val() || 0;
+  const newTotal = snap.val() || 0;
   updateScaleUI();
-  // Не викликаємо checkAutoSpin тут
+  
+  // Якщо сума збільшилась (прийшов донат) — перевіряємо автокрут
+  if (newTotal > prevTotal && !autoSpinInProgress) {
+    currentTotal = newTotal;
+    setTimeout(() => checkAutoSpin(), 500);
+  } else {
+    currentTotal = newTotal;
+  }
+  
+  prevTotal = newTotal;
 });
 
 function updateScaleUI() {
