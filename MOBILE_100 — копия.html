@@ -251,19 +251,9 @@ function parseTimerFromLabel(label) {
   return null;
 }
 
-// Слухаємо spinCommand щоб запускати таймер автоматично
-let lastTimerTs = -1;
-let timerInitialized = false;
 db.ref("spinCommand").on("value", snap => {
   const data = snap.val();
   if (!data) return;
-  if (!timerInitialized) {
-    lastTimerTs = data.ts;
-    timerInitialized = true;
-    return;
-  }
-  if (data.ts === lastTimerTs) return;
-  lastTimerTs = data.ts;
   const seconds = parseTimerFromLabel(data.label);
   if (seconds) {
     document.getElementById("timerLabel").innerText = data.label;
