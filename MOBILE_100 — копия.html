@@ -102,11 +102,44 @@
       from { opacity: 0; transform: translateX(-8px); }
       to   { opacity: 1; transform: translateX(0); }
     }
+    #timerWrap {
+      display: none;
+      width: 100%; max-width: 360px;
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    #timerLabel {
+      font-size: 12px; color: #aaa;
+      letter-spacing: 1px; margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    #timerDisplay {
+      font-size: 52px; font-weight: bold;
+      color: #f0c040;
+      text-shadow: 0 0 20px rgba(240,192,64,0.5);
+      letter-spacing: 4px;
+    }
+    .timer-stop-btn {
+      margin-top: 12px; padding: 8px 20px;
+      border-radius: 8px; border: 1px solid #333;
+      background: transparent; color: #555;
+      font-size: 13px; cursor: pointer;
+    }
+    .timer-stop-btn:hover { color: #e74c3c; border-color: #e74c3c; }
   </style>
 </head>
 <body>
 
 <h1>🎰 РУЛЕТКА</h1>
+
+<div id="timerWrap">
+  <div id="timerLabel"></div>
+  <div id="timerDisplay">0:00</div>
+  <button class="timer-stop-btn" onclick="stopTimer()">Зупинити</button>
+</div>
 
 <div class="section">
   <div class="section-title">Шкала донатів</div>
@@ -162,8 +195,77 @@ let goal = 150;
 let currentTotal = 0;
 let onCooldown = false;
 let autoSpinInProgress = false;
-let prevTotal = -1; // -1 щоб перший раз не тригерив
+let prevTotal = -1;
 
+// --- Таймер ---
+let timerInterval = null;
+
+function startTimer(seconds) {
+  if (timerInterval) clearInterval(timerInterval);
+  const wrap = document.getElementById("timerWrap");
+  const display = document.getElementById("timerDisplay");
+  wrap.style.display = "block";
+  let remaining = seconds;
+  display.innerText = formatTime(remaining);
+  timerInterval = setInterval(() => {
+    remaining--;
+    display.innerText = formatTime(remaining);
+    if (remaining <= 0) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      playBeep();
+      setTimeout(() => { wrap.style.display = "none"; }, 4000);
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+  document.getElementById("timerWrap").style.display = "none";
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function playBeep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.frequency.value = 880;
+  g.gain.setValueAtTime(0.4, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+  o.start(ctx.currentTime);
+  o.stop(ctx.currentTime + 0.8);
+}
+
+function parseTimerFromLabel(label) {
+  const matchM = label.match(/(\d+)\s*(хв|мін|мин|м(?!с)|min)\b/i);
+  if (matchM) return parseInt(matchM[1]) * 60;
+  const matchS = label.match(/(\d+)\s*(с|сек|sec)\b/i);
+  if (matchS) return parseInt(matchS[1]);
+  return null;
+}
+
+// Слухаємо spinCommand щоб запускати таймер автоматично
+let lastTimerTs = 0;
+db.ref("spinCommand").on("value", snap => {
+  const data = snap.val();
+  if (!data || data.ts === lastTimerTs) return;
+  lastTimerTs = data.ts;
+  const seconds = parseTimerFromLabel(data.label);
+  if (seconds) {
+    document.getElementById("timerLabel").innerText = data.label;
+    // Запускаємо таймер після того як колесо зупиниться (~8 сек)
+    setTimeout(() => startTimer(seconds), 30000);
+  }
+});
+
+// --- Firebase ---
 db.ref("options").on("value", snap => {
   if (snap.val()) options = snap.val();
   renderLots();
@@ -180,8 +282,6 @@ db.ref("donateTotal").on("value", snap => {
   const newTotal = snap.val() || 0;
   currentTotal = newTotal;
   updateScaleUI();
-
-  // Тригеримо автокрут тільки якщо сума збільшилась
   if (prevTotal !== -1 && newTotal > prevTotal && newTotal >= goal) {
     setTimeout(() => checkAutoSpin(), 300);
   }
@@ -217,14 +317,10 @@ function setGoal() {
 function checkAutoSpin() {
   if (autoSpinInProgress) return;
   if (currentTotal < goal) return;
-
   autoSpinInProgress = true;
   const spinsNeeded = Math.floor(currentTotal / goal);
   const remainder = currentTotal % goal;
-
-  // Списуємо суму одразу
   db.ref("donateTotal").set(remainder);
-
   for (let i = 0; i < spinsNeeded; i++) {
     setTimeout(() => {
       doSpin();
