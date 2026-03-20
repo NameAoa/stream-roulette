@@ -248,8 +248,14 @@ function startTimer(seconds) {
 function stopTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = null;
-  timerQueue = [];
-  document.getElementById("timerWrap").style.display = "none";
+  // НЕ чистимо чергу — запускаємо наступний якщо є
+  if (timerQueue.length > 0) {
+    const next = timerQueue.shift();
+    document.getElementById("timerLabel").innerText = next.label;
+    setTimeout(() => startTimer(next.seconds), 500);
+  } else {
+    document.getElementById("timerWrap").style.display = "none";
+  }
 }
 
 function toggleTimer() {
@@ -444,7 +450,8 @@ db.ref("spinCommand").on("value", snap => {
   const seconds = parseTimerFromLabel(data.label);
   if (seconds) {
     setTimeout(() => {
-      if (timerInterval) {
+      // Завжди додаємо в чергу, не скипаємо поточний
+      if (timerInterval || timerPaused) {
         timerQueue.push({ label: data.label, seconds });
       } else {
         document.getElementById("timerLabel").innerText = data.label;
