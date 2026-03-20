@@ -210,22 +210,37 @@ let prevTotal = -1;
 
 // --- Таймер ---
 let timerInterval = null;
+let timerPaused = false;
+let timerRemaining = 0;
+let timerQueue = [];
 
 function startTimer(seconds) {
   if (timerInterval) clearInterval(timerInterval);
+  timerPaused = false;
   const wrap = document.getElementById("timerWrap");
   const display = document.getElementById("timerDisplay");
+  const btn = document.getElementById("timerStopBtn");
+  if (btn) btn.innerText = "Пауза";
   wrap.style.display = "block";
   let remaining = seconds;
+  timerRemaining = seconds;
   display.innerText = formatTime(remaining);
   timerInterval = setInterval(() => {
+    if (timerPaused) return;
     remaining--;
+    timerRemaining = remaining;
     display.innerText = formatTime(remaining);
     if (remaining <= 0) {
       clearInterval(timerInterval);
       timerInterval = null;
       playBeep();
-      setTimeout(() => { wrap.style.display = "none"; }, 4000);
+      if (timerQueue.length > 0) {
+        const next = timerQueue.shift();
+        document.getElementById("timerLabel").innerText = next.label;
+        setTimeout(() => startTimer(next.seconds), 1500);
+      } else {
+        setTimeout(() => { wrap.style.display = "none"; }, 4000);
+      }
     }
   }, 1000);
 }
@@ -233,63 +248,20 @@ function startTimer(seconds) {
 function stopTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = null;
+  timerQueue = [];
   document.getElementById("timerWrap").style.display = "none";
 }
-
-let timerPaused = false;
-let timerRemaining = 0;
 
 function toggleTimer() {
   const btn = document.getElementById("timerStopBtn");
   if (timerPaused) {
     timerPaused = false;
     btn.innerText = "Пауза";
-    startTimer(timerRemaining);
   } else {
     timerPaused = true;
-    timerRemaining = parseInt(document.getElementById("timerDisplay").innerText.split(":")[0]) * 60 + parseInt(document.getElementById("timerDisplay").innerText.split(":")[1]);
-    clearInterval(timerInterval);
-    timerInterval = null;
     btn.innerText = "Продовжити";
   }
 }
-
-function formatTime(s) {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
-
-function playBeep() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.connect(g); g.connect(ctx.destination);
-  o.frequency.value = 880;
-  g.gain.setValueAtTime(0.4, ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
-  o.start(ctx.currentTime);
-  o.stop(ctx.currentTime + 0.8);
-}
-
-function parseTimerFromLabel(label) {
-  const matchM = label.match(/(\d+)\s*(хв|мін|мин|min)/i);
-  if (matchM) return parseInt(matchM[1]) * 60;
-  const matchS = label.match(/(\d+)\s*(сек|sec)/i);
-  if (matchS) return parseInt(matchS[1]);
-  return null;
-}
-
-let lastTimerTs = 0;
-db.ref("spinCommand").on("value", snap => {
-  const data = snap.val();
-  if (!data) return;
-  const seconds = parseTimerFromLabel(data.label);
-  if (seconds) {
-    document.getElementById("timerLabel").innerText = data.label;
-    setTimeout(() => startTimer(seconds), 30000);
-  }
-});
 
 // --- Firebase ---
 db.ref("options").on("value", snap => {
@@ -464,6 +436,48 @@ function saveLots() {
   renderLots();
   db.ref("optionsUpdate").set({ ts: Date.now() });
   alert("Збережено! ✅");
+}
+
+db.ref("spinCommand").on("value", snap => {
+  const data = snap.val();
+  if (!data) return;
+  const seconds = parseTimerFromLabel(data.label);
+  if (seconds) {
+    setTimeout(() => {
+      if (timerInterval) {
+        timerQueue.push({ label: data.label, seconds });
+      } else {
+        document.getElementById("timerLabel").innerText = data.label;
+        startTimer(seconds);
+      }
+    }, 30000);
+  }
+});
+
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function playBeep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.frequency.value = 880;
+  g.gain.setValueAtTime(0.4, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+  o.start(ctx.currentTime);
+  o.stop(ctx.currentTime + 0.8);
+}
+
+function parseTimerFromLabel(label) {
+  const matchM = label.match(/(\d+)\s*(хв|мін|мин|min)/i);
+  if (matchM) return parseInt(matchM[1]) * 60;
+  const matchS = label.match(/(\d+)\s*(сек|sec)/i);
+  if (matchS) return parseInt(matchS[1]);
+  return null;
 }
 
 db.ref("history").orderByChild("time").on("value", snap => {
