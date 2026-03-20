@@ -145,7 +145,10 @@
 <div id="timerWrap">
   <div id="timerLabel"></div>
   <div id="timerDisplay">0:00</div>
-  <button class="timer-stop-btn" onclick="stopTimer()">Зупинити</button>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+    <button class="timer-stop-btn" id="timerStopBtn" onclick="toggleTimer()">Пауза</button>
+    <button class="timer-stop-btn" onclick="stopTimer()">Стоп</button>
+  </div>
 </div>
 
 <div class="section">
@@ -232,6 +235,27 @@ function stopTimer() {
   timerInterval = null;
   document.getElementById("timerWrap").style.display = "none";
 }
+
+let timerPaused = false;
+let timerRemaining = 0;
+
+function toggleTimer() {
+  const btn = document.getElementById("timerStopBtn");
+  if (timerPaused) {
+    timerPaused = false;
+    btn.innerText = "Пауза";
+    startTimer(timerRemaining);
+  } else {
+    timerPaused = true;
+    timerRemaining = parseInt(document.getElementById("timerDisplay").innerText.split(":")[0]) * 60 + parseInt(document.getElementById("timerDisplay").innerText.split(":")[1]);
+    clearInterval(timerInterval);
+    timerInterval = null;
+    btn.innerText = "Продовжити";
+  }
+}
+
+<button class="timer-stop-btn" id="timerStopBtn" onclick="toggleTimer()">Пауза</button>
+<button class="timer-stop-btn" onclick="stopTimer()">Стоп</button>
 
 function formatTime(s) {
   const m = Math.floor(s / 60);
