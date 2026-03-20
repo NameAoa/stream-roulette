@@ -463,7 +463,7 @@ db.ref("history").orderByChild("time").on("value", snap => {
 </script>
 
 <!-- DonatePay via Centrifugo -->
-<script src="https://cdn.jsdelivr.net/npm/centrifuge@3.1.0/dist/centrifuge.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/centrifugal/centrifuge-js@2.8.4/dist/centrifuge.min.js"></script>
 <script>
 const DONATEPAY_API_KEY = "gvnLaeWqAIgr5BRyRsfWWA1B0ysYFFcNftGwAUAi3mO99nJykf3PxXyV7B5p";
 const DONATEPAY_ID = 1497;
@@ -479,38 +479,43 @@ async function connectDonatePay() {
       body: JSON.stringify({ access_token: DONATEPAY_API_KEY })
     });
     const data = await res.json();
-    const token = data.token;
 
     const centrifuge = new Centrifuge("wss://centrifugo.donatepay.eu:443/connection/websocket", {
-      token: token
+      subscribeEndpoint: "https://donatepay.eu/api/v2/socket/token",
+      subscribeParams: { access_token: DONATEPAY_API_KEY },
+      disableWithCredentials: true
     });
 
-    centrifuge.on("connected", () => {
+    centrifuge.setToken(data.token);
+
+    centrifuge.on("connect", () => {
       console.log("DonatePay підключено!");
       dpStatus.innerText = "DonatePay: ✅ підключено";
       dpStatus.className = "connected";
     });
 
-    centrifuge.on("disconnected", () => {
+    centrifuge.on("disconnect", () => {
       dpStatus.innerText = "DonatePay: відключено";
       dpStatus.className = "";
     });
 
-    const sub = centrifuge.subscribe("$public:" + DONATEPAY_ID, function(ctx) {
-  const msg = ctx.data;
-  console.log("DonatePay повідомлення:", msg);
-  if (msg.notification && msg.notification.type === "donation") {
-    const amount = parseFloat(msg.notification.vars.sum);
-    const currency = (msg.notification.vars.currency || "RUB").toUpperCase();
-    const rate = DONATEPAY_RATES[currency] || 1;
-    const uah = Math.round(amount * rate);
-    console.log(`Донат: ${amount} ${currency} = ${uah} грн`);
-    db.ref("donateTotal").once("value", snap => {
-      const current = snap.val() || 0;
-      db.ref("donateTotal").set(current + uah);
+    centrifuge.subscribe("$public:" + DONATEPAY_ID, function(msg) {
+      console.log("DonatePay повідомлення:", msg);
+      const notification = msg.data && msg.data.notification;
+      if (notification && notification.type === "donation") {
+        const amount = parseFloat(notification.vars.sum);
+        const currency = (notification.vars.currency || "RUB").toUpperCase();
+        const rate = DONATEPAY_RATES[currency] || 1;
+        const uah = Math.round(amount * rate);
+        console.log(`Донат: ${amount} ${currency} = ${uah} грн`);
+        db.ref("donateTotal").once("value", snap => {
+          const current = snap.val() || 0;
+          db.ref("donateTotal").set(current + uah);
+        });
+      }
     });
-  }
-});
+
+    centrifuge.connect();
 
   } catch(e) {
     console.error("DonatePay помилка:", e);
@@ -521,6 +526,5 @@ async function connectDonatePay() {
 
 connectDonatePay();
 </script>
-
 </body>
 </html>
