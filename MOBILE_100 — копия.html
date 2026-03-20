@@ -129,6 +129,13 @@
       font-size: 13px; cursor: pointer;
     }
     .timer-stop-btn:hover { color: #e74c3c; border-color: #e74c3c; }
+    #donatepayStatus {
+      font-size: 11px; margin-top: 8px;
+      padding: 6px 10px; border-radius: 6px;
+      background: #111; color: #555;
+    }
+    #donatepayStatus.connected { color: #2ecc71; }
+    #donatepayStatus.error { color: #e74c3c; }
   </style>
 </head>
 <body>
@@ -159,6 +166,7 @@
     <input type="number" id="goalInput" placeholder="Ціль (150)" min="1">
     <button class="btn-gold" onclick="setGoal()">Змінити ціль</button>
   </div>
+  <div id="donatepayStatus">DonatePay: підключення...</div>
 </div>
 
 <button class="spin-btn" id="spinBtn" onclick="manualSpin()">КРУТИТИ</button>
@@ -251,6 +259,7 @@ function parseTimerFromLabel(label) {
   return null;
 }
 
+let lastTimerTs = 0;
 db.ref("spinCommand").on("value", snap => {
   const data = snap.val();
   if (!data) return;
@@ -452,5 +461,71 @@ db.ref("history").orderByChild("time").on("value", snap => {
   }
 });
 </script>
+
+<!-- DonatePay via Centrifugo -->
+<script src="https://cdn.jsdelivr.net/gh/centrifugal/centrifuge-js@2.8.4/dist/centrifuge.min.js"></script>
+<script>
+const DONATEPAY_API_KEY = "gvnLaeWqAIgr5BRyRsfWWA1B0ysYFFcNftGwAUAi3mO99nJykf3PxXyV7B5p";
+const DONATEPAY_ID = 1497;
+const DONATEPAY_RATES = { RUB: 2.5, USD: 43, EUR: 51, UAH: 1 };
+
+const dpStatus = document.getElementById("donatepayStatus");
+
+async function connectDonatePay() {
+  try {
+    const res = await fetch("https://donatepay.eu/api/v2/socket/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_token: DONATEPAY_API_KEY })
+    });
+    const data = await res.json();
+    const token = data.token;
+
+    const centrifuge = new Centrifuge("wss://centrifugo.donatepay.eu:443/connection/websocket", {
+      token: token
+    });
+
+    centrifuge.on("connected", () => {
+      console.log("DonatePay підключено!");
+      dpStatus.innerText = "DonatePay: ✅ підключено";
+      dpStatus.className = "connected";
+    });
+
+    centrifuge.on("disconnected", () => {
+      dpStatus.innerText = "DonatePay: відключено";
+      dpStatus.className = "";
+    });
+
+    const sub = centrifuge.newSubscription("$public:" + DONATEPAY_ID);
+
+    sub.on("publication", function(ctx) {
+      const msg = ctx.data;
+      console.log("DonatePay повідомлення:", msg);
+      if (msg.notification && msg.notification.type === "donation") {
+        const amount = parseFloat(msg.notification.vars.sum);
+        const currency = (msg.notification.vars.currency || "RUB").toUpperCase();
+        const rate = DONATEPAY_RATES[currency] || 1;
+        const uah = Math.round(amount * rate);
+        console.log(`Донат: ${amount} ${currency} = ${uah} грн`);
+        db.ref("donateTotal").once("value", snap => {
+          const current = snap.val() || 0;
+          db.ref("donateTotal").set(current + uah);
+        });
+      }
+    });
+
+    sub.subscribe();
+    centrifuge.connect();
+
+  } catch(e) {
+    console.error("DonatePay помилка:", e);
+    dpStatus.innerText = "DonatePay: ❌ помилка підключення";
+    dpStatus.className = "error";
+  }
+}
+
+connectDonatePay();
+</script>
+
 </body>
 </html>
