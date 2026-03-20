@@ -496,26 +496,21 @@ async function connectDonatePay() {
       dpStatus.className = "";
     });
 
-    const sub = centrifuge.newSubscription("$public:" + DONATEPAY_ID);
-
-    sub.on("publication", function(ctx) {
-      const msg = ctx.data;
-      console.log("DonatePay повідомлення:", msg);
-      if (msg.notification && msg.notification.type === "donation") {
-        const amount = parseFloat(msg.notification.vars.sum);
-        const currency = (msg.notification.vars.currency || "RUB").toUpperCase();
-        const rate = DONATEPAY_RATES[currency] || 1;
-        const uah = Math.round(amount * rate);
-        console.log(`Донат: ${amount} ${currency} = ${uah} грн`);
-        db.ref("donateTotal").once("value", snap => {
-          const current = snap.val() || 0;
-          db.ref("donateTotal").set(current + uah);
-        });
-      }
+    const sub = centrifuge.subscribe("$public:" + DONATEPAY_ID, function(ctx) {
+  const msg = ctx.data;
+  console.log("DonatePay повідомлення:", msg);
+  if (msg.notification && msg.notification.type === "donation") {
+    const amount = parseFloat(msg.notification.vars.sum);
+    const currency = (msg.notification.vars.currency || "RUB").toUpperCase();
+    const rate = DONATEPAY_RATES[currency] || 1;
+    const uah = Math.round(amount * rate);
+    console.log(`Донат: ${amount} ${currency} = ${uah} грн`);
+    db.ref("donateTotal").once("value", snap => {
+      const current = snap.val() || 0;
+      db.ref("donateTotal").set(current + uah);
     });
-
-    sub.subscribe();
-    centrifuge.connect();
+  }
+});
 
   } catch(e) {
     console.error("DonatePay помилка:", e);
