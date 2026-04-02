@@ -98,6 +98,9 @@
       display: flex; justify-content: space-between;
       animation: fadeIn 0.3s ease;
     }
+    .history-time {
+      font-size: 11px; color: #444; margin-top: 3px;
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateX(-8px); }
       to   { opacity: 1; transform: translateX(0); }
@@ -136,6 +139,18 @@
     }
     #donatepayStatus.connected { color: #2ecc71; }
     #donatepayStatus.error { color: #e74c3c; }
+    .spin-queue-info {
+      margin-top: 8px; font-size: 13px; color: #f0c040;
+      min-height: 18px; text-align: center;
+    }
+    .btn-stop-spins {
+      margin-top: 10px; padding: 10px 20px;
+      border-radius: 8px; border: 2px solid #e74c3c;
+      background: transparent; color: #e74c3c;
+      font-size: 14px; font-weight: bold; cursor: pointer;
+      width: 190px;
+    }
+    .btn-stop-spins:hover { background: #e74c3c; color: white; }
   </style>
 </head>
 <body>
@@ -173,6 +188,8 @@
 </div>
 
 <button class="spin-btn" id="spinBtn" onclick="manualSpin()">КРУТИТИ</button>
+<div class="spin-queue-info" id="spinQueueInfo"></div>
+<button class="btn-stop-spins" id="stopSpinsBtn" onclick="stopAllSpins()" style="display:none">⛔ Зупинити всі крутки</button>
 <div class="cooldown" id="cooldown"></div>
 
 <div class="section" style="margin-top:24px">
@@ -183,7 +200,10 @@
 </div>
 
 <div class="section">
-  <div class="section-title">Історія</div>
+  <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+    <span>Історія</span>
+    <button onclick="clearHistory()" style="background:none;border:none;color:#555;font-size:11px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;">Очистити</button>
+  </div>
   <ul id="history" style="list-style:none;"></ul>
 </div>
 
@@ -207,6 +227,7 @@ let currentTotal = 0;
 let onCooldown = false;
 let autoSpinInProgress = false;
 let prevTotal = -1;
+let spinQueue = 0; // кількість крутків в черзі
 
 // --- Таймер ---
 let timerInterval = null;
@@ -248,7 +269,6 @@ function startTimer(seconds) {
 function stopTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = null;
-  // НЕ чистимо чергу — запускаємо наступний якщо є
   if (timerQueue.length > 0) {
     const next = timerQueue.shift();
     document.getElementById("timerLabel").innerText = next.label;
@@ -301,7 +321,7 @@ function updateScaleUI() {
 function addDonate() {
   const val = parseFloat(document.getElementById("addAmount").value);
   if (!val || val <= 0) return;
-  db.ref("donateTotal").set(currentTotal + val);
+  db.ref("donateTotal").transaction(current => (current || 0) + val);
   document.getElementById("addAmount").value = "";
 }
 
@@ -318,6 +338,26 @@ function setGoal() {
   document.getElementById("goalInput").value = "";
 }
 
+function updateSpinQueueUI() {
+  const info = document.getElementById("spinQueueInfo");
+  const stopBtn = document.getElementById("stopSpinsBtn");
+  if (spinQueue > 0) {
+    info.innerText = `В черзі: ${spinQueue} крутк${spinQueue === 1 ? "а" : "ів"}`;
+    stopBtn.style.display = "block";
+  } else {
+    info.innerText = "";
+    stopBtn.style.display = "none";
+  }
+}
+
+function stopAllSpins() {
+  if (confirm("Зупинити всі заплановані крутки?")) {
+    spinQueue = 0;
+    autoSpinInProgress = false;
+    updateSpinQueueUI();
+  }
+}
+
 function checkAutoSpin() {
   if (autoSpinInProgress) return;
   if (currentTotal < goal) return;
@@ -325,8 +365,14 @@ function checkAutoSpin() {
   const spinsNeeded = Math.floor(currentTotal / goal);
   const remainder = currentTotal % goal;
   db.ref("donateTotal").set(remainder);
+  spinQueue += spinsNeeded;
+  updateSpinQueueUI();
+
   for (let i = 0; i < spinsNeeded; i++) {
     setTimeout(() => {
+      if (spinQueue <= 0) return;
+      spinQueue--;
+      updateSpinQueueUI();
       doSpin();
       if (i === spinsNeeded - 1) {
         setTimeout(() => { autoSpinInProgress = false; }, 1000);
@@ -444,13 +490,24 @@ function saveLots() {
   alert("Збережено! ✅");
 }
 
+function clearHistory() {
+  if (confirm("Очистити всю історію?")) {
+    db.ref("history").remove();
+  }
+}
+
+function formatDateTime(timestamp) {
+  const d = new Date(timestamp);
+  const pad = n => n.toString().padStart(2, "0");
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 db.ref("spinCommand").on("value", snap => {
   const data = snap.val();
   if (!data) return;
   const seconds = parseTimerFromLabel(data.label);
   if (seconds) {
     setTimeout(() => {
-      // Завжди додаємо в чергу, не скипаємо поточний
       if (timerInterval || timerPaused) {
         timerQueue.push({ label: data.label, seconds });
       } else {
@@ -497,7 +554,14 @@ db.ref("history").orderByChild("time").on("value", snap => {
       const li = document.createElement("li");
       li.className = "history-item";
       const val = typeof item === "string" ? item : item.value;
-      li.innerHTML = `<span>${val}</span><span style="color:#555;font-size:12px">#${items.length - i}</span>`;
+      const time = item.time ? formatDateTime(item.time) : "";
+      li.innerHTML = `
+        <div>
+          <div>${val}</div>
+          <div class="history-time">${time}</div>
+        </div>
+        <span style="color:#555;font-size:12px">#${items.length - i}</span>
+      `;
       historyList.appendChild(li);
     });
   }
@@ -531,7 +595,6 @@ async function connectDonatePay() {
     centrifuge.setToken(data.token);
 
     centrifuge.on("connect", () => {
-      console.log("DonatePay підключено!");
       dpStatus.innerText = "DonatePay: ✅ підключено";
       dpStatus.className = "connected";
     });
@@ -542,7 +605,6 @@ async function connectDonatePay() {
     });
 
     centrifuge.subscribe("$public:" + DONATEPAY_ID, function(msg) {
-      console.log("DonatePay повідомлення:", msg);
       const notification = msg.data && msg.data.notification;
       if (notification && notification.type === "donation") {
         const amount = parseFloat(notification.vars.sum);
@@ -551,11 +613,7 @@ async function connectDonatePay() {
         const uah = currency === "RUB"
           ? Math.round(amount / rate)
           : Math.round(amount * rate);
-        console.log(`Донат: ${amount} ${currency} = ${uah} грн`);
-        db.ref("donateTotal").once("value", snap => {
-          const current = snap.val() || 0;
-          db.ref("donateTotal").set(current + uah);
-        });
+        db.ref("donateTotal").transaction(current => (current || 0) + uah);
       }
     });
 
