@@ -30,36 +30,25 @@
       transition: opacity 0.5s ease, transform 0.5s ease;
     }
     .wheel-wrap.visible { opacity: 1; transform: scale(1); }
-    canvas {
-      border-radius: 50%;
-      box-shadow: 0 0 40px rgba(140,80,200,0.6);
-    }
+    #wheel { display: block; }
     #particleCanvas {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      pointer-events: none;
-      z-index: 100;
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 100;
     }
-    .arrow-wrap {
-      position: absolute; top: -18px; left: 50%;
+    #arrowCanvas {
+      position: absolute; top: -22px; left: 50%;
       transform: translateX(-50%);
       z-index: 10;
-      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8));
     }
-    .arrow-wrap svg { width: 36px; height: 52px; }
     #spinResult {
-      margin-top: 16px;
-      min-height: 90px;
-      font-size: 48px;
-      font-family: 'Poiret One', cursive;
+      margin-top: 16px; min-height: 90px;
+      font-size: 48px; font-family: 'Poiret One', cursive;
       color: #fff;
       text-shadow: 0 0 30px rgba(180,100,255,1), 0 0 60px rgba(140,80,200,0.7);
-      letter-spacing: 4px;
-      opacity: 0;
-      text-align: center;
-      position: relative;
-      z-index: 200;
+      letter-spacing: 4px; opacity: 0;
+      text-align: center; position: relative; z-index: 200;
+      transition: opacity 0.6s;
     }
   </style>
 </head>
@@ -72,20 +61,7 @@
 </div>
 
 <div class="wheel-wrap" id="wheelWrap">
-  <div class="arrow-wrap">
-    <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" style="stop-color:#666"/>
-          <stop offset="30%" style="stop-color:#ddd"/>
-          <stop offset="60%" style="stop-color:#aaa"/>
-          <stop offset="100%" style="stop-color:#555"/>
-        </linearGradient>
-      </defs>
-      <polygon points="18,52 0,4 36,4" fill="url(#metalGrad)"/>
-      <rect x="6" y="0" width="24" height="8" rx="2" fill="url(#metalGrad)" stroke="#333" stroke-width="1"/>
-    </svg>
-  </div>
+  <canvas id="arrowCanvas" width="40" height="62"></canvas>
   <canvas id="wheel" width="420" height="420"></canvas>
 </div>
 
@@ -94,6 +70,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
+// ─── Firebase ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
   authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
@@ -103,34 +80,430 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-const colors = [
-  "#3d1a6e", "#5a2d91", "#7b4fa6", "#9d6dbf",
-  "#4a2278", "#6b3d9e", "#8c5ab5", "#b07fd4"
+// ─── Palette ──────────────────────────────────────────────────────────────────
+const COLORS = [
+  "#3d1a6e","#5a2d91","#7b4fa6","#9d6dbf",
+  "#4a2278","#6b3d9e","#8c5ab5","#b07fd4"
 ];
 
-let options = [];
-let goal = 150;
+// ─── Elements ─────────────────────────────────────────────────────────────────
+const wheelCanvas = document.getElementById("wheel");
+const wCtx        = wheelCanvas.getContext("2d");
+const arrowCanvas = document.getElementById("arrowCanvas");
+const aCtx        = arrowCanvas.getContext("2d");
+const pCanvas     = document.getElementById("particleCanvas");
+const pCtx        = pCanvas.getContext("2d");
+const wheelWrap   = document.getElementById("wheelWrap");
+const scaleWrap   = document.getElementById("scaleWrap");
+const scaleLabel  = document.getElementById("scaleLabel");
+const spinResult  = document.getElementById("spinResult");
 
-const canvas = document.getElementById("wheel");
-const ctx = canvas.getContext("2d");
-const wheelWrap = document.getElementById("wheelWrap");
-const scaleWrap = document.getElementById("scaleWrap");
-const scaleLabel = document.getElementById("scaleLabel");
-const spinResult = document.getElementById("spinResult");
+function resizeP() { pCanvas.width = window.innerWidth; pCanvas.height = window.innerHeight; }
+resizeP();
+window.addEventListener("resize", resizeP);
 
-// Particle canvas
-const pCanvas = document.getElementById("particleCanvas");
-const pCtx = pCanvas.getContext("2d");
-pCanvas.width = window.innerWidth;
-pCanvas.height = window.innerHeight;
+// ─── State ────────────────────────────────────────────────────────────────────
+let options = [], goal = 150, currentAngle = 0;
+let isSpinning = false, hideTimer = null;
+let spinQueue = [], processingQueue = false;
+let particles = [], particleAnimId = null;
+let lastArrowSector = -1;
 
-let currentAngle = 0;
-let isSpinning = false;
-let hideTimer = null;
-let spinQueue = [];
-let processingQueue = false;
-let particles = [];
-let particleAnimId = null;
+// ─── Spring Arrow ─────────────────────────────────────────────────────────────
+const spring = { angle: 0, vel: 0, stiffness: 0.30, damping: 0.52 };
+
+function tickSpring() {
+  const f = -spring.stiffness * spring.angle - spring.damping * spring.vel;
+  spring.vel   += f;
+  spring.angle += spring.vel;
+}
+
+function renderArrow() {
+  const W = arrowCanvas.width, H = arrowCanvas.height;
+  aCtx.clearRect(0, 0, W, H);
+  aCtx.save();
+  // Pivot = tip of arrow = bottom centre
+  aCtx.translate(W / 2, H - 4);
+  aCtx.rotate(spring.angle);
+  aCtx.translate(-W / 2, -(H - 4));
+
+  const grd = aCtx.createLinearGradient(0, 0, W, 0);
+  grd.addColorStop(0,   "#555");
+  grd.addColorStop(0.28,"#ddd");
+  grd.addColorStop(0.62,"#aaa");
+  grd.addColorStop(1,   "#555");
+
+  // Arrow triangle (tip down)
+  aCtx.beginPath();
+  aCtx.moveTo(W / 2, H - 4);   // tip
+  aCtx.lineTo(3,  10);
+  aCtx.lineTo(W - 3, 10);
+  aCtx.closePath();
+  aCtx.fillStyle   = grd;
+  aCtx.shadowColor = "rgba(0,0,0,0.65)";
+  aCtx.shadowBlur  = 7;
+  aCtx.fill();
+
+  // Cap rectangle
+  aCtx.shadowBlur = 0;
+  aCtx.beginPath();
+  aCtx.roundRect(6, 1, W - 12, 12, 3);
+  aCtx.fillStyle   = grd;
+  aCtx.strokeStyle = "#333";
+  aCtx.lineWidth   = 1;
+  aCtx.fill();
+  aCtx.stroke();
+
+  aCtx.restore();
+}
+
+function kickArrow() { spring.vel += (Math.random() > 0.5 ? 1 : -1) * 0.22; }
+
+(function arrowLoop() {
+  tickSpring();
+  renderArrow();
+  requestAnimationFrame(arrowLoop);
+})();
+
+// ─── Wheel helpers ────────────────────────────────────────────────────────────
+function getArcs() {
+  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
+  return options.map(o => ((o.weight || 1) / total) * Math.PI * 2);
+}
+
+function getSectorUnderArrow(angle) {
+  if (!options.length) return -1;
+  const arcs = getArcs();
+  const norm  = (((- Math.PI / 2) - angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  let cum = 0;
+  for (let i = 0; i < arcs.length; i++) { cum += arcs[i]; if (norm < cum) return i; }
+  return 0;
+}
+
+function lighten(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${Math.min(255,(n>>16)+amt)},${Math.min(255,((n>>8)&0xff)+amt)},${Math.min(255,(n&0xff)+amt)})`;
+}
+
+// ─── Draw wheel ───────────────────────────────────────────────────────────────
+function drawWheel(angle, hlIdx = -1) {
+  const W = wheelCanvas.width, H = wheelCanvas.height;
+  const cx = W / 2, cy = H / 2, R = cx - 5;
+  wCtx.clearRect(0, 0, W, H);
+
+  // Circular clip — eliminates any glow leaking outside
+  wCtx.save();
+  wCtx.beginPath();
+  wCtx.arc(cx, cy, R, 0, Math.PI * 2);
+  wCtx.clip();
+
+  const arcs = getArcs();
+  let sa = angle;
+  for (let i = 0; i < options.length; i++) {
+    const ea  = sa + arcs[i];
+    const isHl = i === hlIdx;
+    const base = COLORS[i % COLORS.length];
+
+    wCtx.globalAlpha = (hlIdx !== -1 && !isHl) ? 0.35 : 1;
+
+    const g = wCtx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    if (isHl) {
+      g.addColorStop(0,    lighten(base, 130));
+      g.addColorStop(0.5,  lighten(base, 80));
+      g.addColorStop(1,    lighten(base, 40));
+    } else {
+      g.addColorStop(0, lighten(base, 50));
+      g.addColorStop(1, base);
+    }
+
+    wCtx.beginPath();
+    wCtx.moveTo(cx, cy);
+    wCtx.arc(cx, cy, R, sa, ea);
+    wCtx.closePath();
+    wCtx.fillStyle = g;
+    wCtx.fill();
+
+    // Sector divider
+    wCtx.globalAlpha = isHl ? 0.85 : 0.22;
+    wCtx.strokeStyle = isHl ? "rgba(255,230,255,1)" : "rgba(255,255,255,1)";
+    wCtx.lineWidth   = isHl ? 2.5 : 1.5;
+    wCtx.stroke();
+
+    sa = ea;
+  }
+  wCtx.restore(); // end clip
+
+  // Outer ring (outside clip so it's just a ring, not filled)
+  wCtx.save();
+  wCtx.beginPath();
+  wCtx.arc(cx, cy, R, 0, Math.PI * 2);
+  wCtx.strokeStyle = "rgba(170,100,255,0.5)";
+  wCtx.lineWidth   = 4;
+  wCtx.stroke();
+  wCtx.restore();
+
+  // Labels
+  sa = angle;
+  for (let i = 0; i < options.length; i++) {
+    const arc = arcs[i];
+    const isHl = i === hlIdx;
+    wCtx.save();
+    wCtx.globalAlpha = (hlIdx !== -1 && !isHl) ? 0.35 : 1;
+    wCtx.translate(cx, cy);
+    wCtx.rotate(sa + arc / 2);
+    wCtx.textAlign   = "right";
+    wCtx.fillStyle   = "#fff";
+    wCtx.font        = isHl ? "bold 14px 'Poiret One'" : "13px 'Poiret One'";
+    wCtx.shadowColor = "rgba(0,0,0,0.9)";
+    wCtx.shadowBlur  = 4;
+    wCtx.fillText(options[i].label, R - 14, 6);
+    wCtx.restore();
+    sa += arc;
+  }
+}
+
+// ─── Particles ────────────────────────────────────────────────────────────────
+
+// Returns array of {x,y} screen coords where the text is rendered
+function buildTextTargets(label, centerX, centerY) {
+  const W = 900, H = 180;
+  const off = document.createElement("canvas");
+  off.width = W; off.height = H;
+  const oc = off.getContext("2d");
+
+  // Auto-fit font size
+  let fs = 100;
+  oc.font = `bold ${fs}px 'Poiret One', sans-serif`;
+  while (oc.measureText(label).width > W - 30 && fs > 24) {
+    fs -= 4;
+    oc.font = `bold ${fs}px 'Poiret One', sans-serif`;
+  }
+
+  oc.fillStyle     = "#fff";
+  oc.textAlign     = "center";
+  oc.textBaseline  = "middle";
+  oc.fillText(label, W / 2, H / 2);
+
+  const data = oc.getImageData(0, 0, W, H).data;
+  const pts  = [];
+  // Sample every 5px — dense enough and still readable
+  for (let y = 0; y < H; y += 5) {
+    for (let x = 0; x < W; x += 5) {
+      if (data[(y * W + x) * 4 + 3] > 100) {
+        pts.push({
+          x: centerX + (x - W / 2),
+          y: centerY + (y - H / 2)
+        });
+      }
+    }
+  }
+  return pts;
+}
+
+class Particle {
+  constructor(x, y, color, sz) {
+    this.x = x; this.y = y;
+    this.color = color;
+    this.size  = sz || (2 + Math.random() * 4);
+    this.alpha = 1;
+    this.phase = "fall";
+    this.tx = 0; this.ty = 0;
+
+    // Outward burst + gravity
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 1 + Math.random() * 7;
+    this.vx  = Math.cos(ang) * spd;
+    this.vy  = -1 - Math.random() * 5;
+    this.grav = 0.16 + Math.random() * 0.12;
+    this.fric = 0.988;
+    this.rot  = Math.random() * Math.PI * 2;
+    this.rotV = (Math.random() - 0.5) * 0.14;
+  }
+
+  update() {
+    if (this.phase === "fall") {
+      this.vy += this.grav;
+      this.vx *= this.fric;
+      this.x  += this.vx;
+      this.y  += this.vy;
+      this.rot += this.rotV;
+      // don't auto-fade during fall so they look like drifting sand
+    } else {
+      const dx = this.tx - this.x, dy = this.ty - this.y;
+      this.x  += dx * 0.06;
+      this.y  += dy * 0.06;
+      this.alpha = Math.min(1, this.alpha + 0.018);
+      this.size  = Math.max(1, this.size * 0.993);
+      this.rot   += this.rotV * 0.3;
+    }
+  }
+
+  draw() {
+    if (this.alpha <= 0.01) return;
+    pCtx.save();
+    pCtx.globalAlpha = this.alpha;
+    pCtx.fillStyle   = this.color;
+    pCtx.translate(this.x, this.y);
+    pCtx.rotate(this.rot);
+    pCtx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+    pCtx.restore();
+  }
+}
+
+function spawnWheelSand(wCx, wCy) {
+  particles = [];
+  const R   = 205;
+  const N   = 600;
+  const arcs = getArcs();
+
+  // Weighted colour palette
+  const palette = [];
+  for (let i = 0; i < options.length; i++) {
+    const count = Math.max(1, Math.round(arcs[i] / (Math.PI * 2) * N));
+    for (let k = 0; k < count; k++) palette.push(COLORS[i % COLORS.length]);
+  }
+  palette.sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < N; i++) {
+    const r   = R * Math.sqrt(Math.random());
+    const ang = Math.random() * Math.PI * 2;
+    const px  = wCx + r * Math.cos(ang);
+    const py  = wCy + r * Math.sin(ang);
+    const col = palette[i % palette.length];
+    const sz  = 1.5 + Math.random() * 4;
+    particles.push(new Particle(px, py, col, sz));
+  }
+}
+
+function setGatherTargets(label, wCy) {
+  const cx   = pCanvas.width  / 2;
+  // Text sits roughly where the spinResult div would be (just below wheel centre)
+  const textCy = wCy + 50;
+
+  const targets = buildTextTargets(label, cx, textCy);
+  if (!targets.length) return;
+  targets.sort(() => Math.random() - 0.5);
+
+  particles.forEach((p, i) => {
+    if (i < targets.length) {
+      p.tx    = targets[i].x;
+      p.ty    = targets[i].y;
+      p.phase = "gather";
+      p.color = "#fff";
+    } else {
+      p.alpha = 0; // dismiss extras
+    }
+  });
+
+  // Spawn extras if text needs more dots than we have
+  for (let i = particles.length; i < targets.length; i++) {
+    const ep = new Particle(cx, wCy - 60, "#fff", 2);
+    ep.phase = "gather";
+    ep.tx    = targets[i].x;
+    ep.ty    = targets[i].y;
+    ep.alpha = 0.05;
+    particles.push(ep);
+  }
+}
+
+function runParticles() {
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  particles = particles.filter(p => p.alpha > 0.01);
+  for (const p of particles) { p.update(); p.draw(); }
+  if (particles.length) {
+    particleAnimId = requestAnimationFrame(runParticles);
+  } else {
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    particleAnimId = null;
+  }
+}
+
+// ─── Spin logic ───────────────────────────────────────────────────────────────
+function spinTo(idx, onDone) {
+  if (isSpinning) return;
+  isSpinning = true;
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  spinResult.style.opacity = "0";
+  particles = [];
+  if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+  const arcs = getArcs();
+  let ss = 0;
+  for (let i = 0; i < idx; i++) ss += arcs[i];
+  const sm     = ss + arcs[idx] / 2;
+  const target = Math.PI / 2 - sm + Math.PI;
+  const norm   = currentAngle % (Math.PI * 2);
+  let diff     = target - norm;
+  while (diff < 0) diff += Math.PI * 2;
+
+  const finalAngle = currentAngle + diff + (6 + Math.floor(Math.random() * 3)) * Math.PI * 2;
+  const dur        = 4500;
+  const t0         = performance.now();
+  const a0         = currentAngle;
+  lastArrowSector  = -1;
+
+  function frame(now) {
+    const prog = Math.min((now - t0) / dur, 1);
+    const ease = 1 - Math.pow(1 - prog, 4);
+    currentAngle = a0 + (finalAngle - a0) * ease;
+
+    const sec = getSectorUnderArrow(currentAngle);
+    drawWheel(currentAngle, sec);
+
+    if (sec !== lastArrowSector) {
+      if (lastArrowSector !== -1) kickArrow();
+      lastArrowSector = sec;
+    }
+
+    if (prog < 1) { requestAnimationFrame(frame); return; }
+
+    // Finished
+    isSpinning = false;
+    drawWheel(currentAngle, idx);
+
+    const rect = wheelCanvas.getBoundingClientRect();
+    const wCx  = rect.left + rect.width  / 2;
+    const wCy  = rect.top  + rect.height / 2;
+
+    db.ref("history").push({ value: options[idx].label, time: Date.now() });
+
+    // Show winning highlight briefly, then dissolve into sand
+    setTimeout(() => {
+      wheelWrap.classList.remove("visible");
+
+      spawnWheelSand(wCx, wCy);
+      runParticles();
+
+      // Sand falls for 1 s, then gathers into text
+      setTimeout(() => { setGatherTargets(options[idx].label, wCy); }, 1000);
+
+      // Clean up after 8 s
+      hideTimer = setTimeout(() => {
+        spinResult.style.opacity = "0";
+        particles = [];
+        if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
+        pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+        if (onDone) onDone();
+      }, 8000);
+    }, 1400);
+  }
+  requestAnimationFrame(frame);
+}
+
+function processQueue() {
+  if (processingQueue || !spinQueue.length) return;
+  processingQueue = true;
+  const idx = spinQueue.shift();
+  wheelWrap.classList.add("visible");
+  spinTo(idx, () => {
+    processingQueue = false;
+    if (spinQueue.length) setTimeout(processQueue, 600);
+  });
+}
+
+// ─── Firebase listeners ───────────────────────────────────────────────────────
+drawWheel(0);
 
 db.ref("options").on("value", snap => {
   if (snap.val()) { options = snap.val(); drawWheel(currentAngle); }
@@ -139,379 +512,13 @@ db.ref("goal").on("value", snap => {
   if (snap.val()) goal = snap.val();
 });
 
-function getArcs() {
-  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
-  return options.map(o => ((o.weight || 1) / total) * 2 * Math.PI);
-}
-
-// Returns index of sector currently under the arrow (top, 270deg = -PI/2)
-function getSectorUnderArrow(angle) {
-  if (!options.length) return -1;
-  const arcs = getArcs();
-  // Arrow is at top = -Math.PI/2 in canvas coords
-  // Normalise angle so sector start = 0
-  const arrowAngle = ((-Math.PI / 2) - angle) % (2 * Math.PI);
-  const norm = ((arrowAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  let cumulative = 0;
-  for (let i = 0; i < arcs.length; i++) {
-    cumulative += arcs[i];
-    if (norm < cumulative) return i;
-  }
-  return 0;
-}
-
-function lighten(hex, amount) {
-  const num = parseInt(hex.slice(1), 16);
-  const r = Math.min(255, (num >> 16) + amount);
-  const g = Math.min(255, ((num >> 8) & 0xff) + amount);
-  const b = Math.min(255, (num & 0xff) + amount);
-  return `rgb(${r},${g},${b})`;
-}
-
-function drawWheel(angle, highlightIndex = -1) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const cx = canvas.width / 2, cy = canvas.height / 2;
-  const radius = cx - 5;
-  const arcs = getArcs();
-  let startA = angle;
-
-  for (let i = 0; i < options.length; i++) {
-    const endA = startA + arcs[i];
-    const isHighlighted = i === highlightIndex;
-
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radius, startA, endA);
-    ctx.closePath();
-
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-    const base = colors[i % colors.length];
-
-    if (isHighlighted) {
-      // Bright glowing sector
-      grad.addColorStop(0, lighten(base, 110));
-      grad.addColorStop(0.5, lighten(base, 75));
-      grad.addColorStop(1, lighten(base, 40));
-      ctx.fillStyle = grad;
-      ctx.fill();
-      // Extra glow stroke
-      ctx.strokeStyle = "rgba(255,220,255,0.9)";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      // Glow aura around sector
-      ctx.save();
-      ctx.shadowColor = "rgba(220,150,255,1)";
-      ctx.shadowBlur = 28;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, radius, startA, endA);
-      ctx.closePath();
-      ctx.strokeStyle = "rgba(220,150,255,0.6)";
-      ctx.lineWidth = 6;
-      ctx.stroke();
-      ctx.restore();
-    } else {
-      // Dimmed sector during spin, normal otherwise
-      const dimAmount = (highlightIndex !== -1) ? 0 : 50;
-      grad.addColorStop(0, lighten(base, 50 - dimAmount));
-      grad.addColorStop(1, base);
-      ctx.fillStyle = grad;
-
-      if (highlightIndex !== -1) {
-        // Dim non-highlighted sectors
-        ctx.globalAlpha = 0.45;
-      }
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = "rgba(255,255,255,0.2)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-    // Text
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(startA + arcs[i] / 2);
-    ctx.textAlign = "right";
-    ctx.fillStyle = isHighlighted ? "#fff" : (highlightIndex !== -1 ? "rgba(255,255,255,0.5)" : "#fff");
-    ctx.font = isHighlighted ? "bold 14px 'Poiret One'" : "13px 'Poiret One'";
-    ctx.shadowColor = isHighlighted ? "rgba(255,200,255,0.9)" : "rgba(0,0,0,0.8)";
-    ctx.shadowBlur = isHighlighted ? 10 : 5;
-    ctx.fillText(options[i].label, radius - 14, 6);
-    ctx.restore();
-
-    startA = endA;
-  }
-}
-
-// ── Particle explosion ──────────────────────────────────────────────────────
-
-class Particle {
-  constructor(x, y, color) {
-    this.x = x;
-    this.y = y;
-    this.ox = x; // origin
-    this.oy = y;
-    this.color = color;
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 3 + Math.random() * 9;
-    this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed;
-    this.size = 3 + Math.random() * 5;
-    this.alpha = 1;
-    this.decay = 0.012 + Math.random() * 0.012;
-    // Shape: 0=circle, 1=star, 2=square
-    this.shape = Math.floor(Math.random() * 3);
-    this.rotation = Math.random() * Math.PI * 2;
-    this.rotSpeed = (Math.random() - 0.5) * 0.2;
-    this.gravity = 0.15;
-    this.phase = "explode"; // explode → gather
-    this.tx = 0; this.ty = 0; // gather target
-  }
-
-  update() {
-    if (this.phase === "explode") {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += this.gravity;
-      this.vx *= 0.97;
-      this.rotation += this.rotSpeed;
-      this.alpha -= this.decay * 0.3; // slower fade during explosion
-    } else {
-      // Gather toward target
-      this.x += (this.tx - this.x) * 0.07;
-      this.y += (this.ty - this.y) * 0.07;
-      this.alpha = Math.min(1, this.alpha + 0.02);
-      this.size *= 0.97;
-    }
-  }
-
-  draw(ctx) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, this.alpha);
-    ctx.fillStyle = this.color;
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rotation);
-
-    if (this.shape === 0) {
-      ctx.beginPath();
-      ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (this.shape === 1) {
-      // Star
-      ctx.beginPath();
-      for (let j = 0; j < 5; j++) {
-        const a = (j * Math.PI * 2) / 5 - Math.PI / 2;
-        const r = j % 2 === 0 ? this.size / 2 : this.size / 4;
-        j === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r) : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
-      }
-      ctx.closePath();
-      ctx.fill();
-    } else {
-      ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
-    }
-    ctx.restore();
-  }
-}
-
-function spawnExplosion(cx, cy, colorBase) {
-  const count = 120;
-  const palette = [
-    colorBase,
-    lighten(colorBase, 60),
-    "#e0b0ff", "#fff", "#c080f0", "#9b59b6"
-  ];
-  for (let i = 0; i < count; i++) {
-    const col = palette[Math.floor(Math.random() * palette.length)];
-    particles.push(new Particle(cx, cy, col));
-  }
-}
-
-// Scatter particles to form text
-function scatterToText(label) {
-  // Draw text offscreen to get pixel positions
-  const offCanvas = document.createElement("canvas");
-  offCanvas.width = 600;
-  offCanvas.height = 150;
-  const offCtx = offCanvas.getContext("2d");
-  offCtx.fillStyle = "#fff";
-  offCtx.font = "bold 72px 'Poiret One', cursive";
-  offCtx.textAlign = "center";
-  offCtx.textBaseline = "middle";
-  offCtx.fillText(label, 300, 75);
-
-  const imageData = offCtx.getImageData(0, 0, 600, 150);
-  const data = imageData.data;
-  const textPixels = [];
-  for (let y = 0; y < 150; y += 3) {
-    for (let x = 0; x < 600; x += 3) {
-      const idx = (y * 600 + x) * 4;
-      if (data[idx + 3] > 128) {
-        textPixels.push({ x, y });
-      }
-    }
-  }
-
-  if (!textPixels.length) return;
-
-  // Center in screen
-  const screenCx = pCanvas.width / 2;
-  const screenCy = pCanvas.height / 2 + 200; // below wheel area
-
-  const offsetX = screenCx - 300;
-  const offsetY = screenCy - 75;
-
-  // Assign targets to existing particles
-  const shuffled = textPixels.sort(() => Math.random() - 0.5);
-  particles.forEach((p, i) => {
-    if (i < shuffled.length) {
-      p.tx = shuffled[i].x + offsetX;
-      p.ty = shuffled[i].y + offsetY;
-    } else {
-      // Extra particles fade out
-      p.phase = "done";
-      p.alpha = 0;
-    }
-    p.phase = "gather";
-    p.alpha = Math.max(0.3, p.alpha);
-  });
-
-  // Pad with extra particles if text needs more
-  for (let i = particles.length; i < Math.min(shuffled.length, 200); i++) {
-    const p = new Particle(screenCx, screenCy - 100, "#e0b0ff");
-    p.phase = "gather";
-    p.tx = shuffled[i].x + offsetX;
-    p.ty = shuffled[i].y + offsetY;
-    p.alpha = 0.1;
-    particles.push(p);
-  }
-}
-
-function animateParticles() {
-  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-  particles = particles.filter(p => p.alpha > 0.01 && p.phase !== "done");
-  particles.forEach(p => { p.update(); p.draw(pCtx); });
-  if (particles.length > 0) {
-    particleAnimId = requestAnimationFrame(animateParticles);
-  } else {
-    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-  }
-}
-
-// ── Spin logic ──────────────────────────────────────────────────────────────
-
-function spinTo(index, onDone) {
-  if (isSpinning) return;
-  isSpinning = true;
-  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-  spinResult.style.opacity = "0";
-  particles = [];
-  if (particleAnimId) cancelAnimationFrame(particleAnimId);
-
-  const arcs = getArcs();
-  let sectorStart = 0;
-  for (let i = 0; i < index; i++) sectorStart += arcs[i];
-  const sectorMid = sectorStart + arcs[index] / 2;
-
-  const target = (Math.PI / 2) - sectorMid + Math.PI;
-  const normalizedCurrent = currentAngle % (2 * Math.PI);
-  let diff = target - normalizedCurrent;
-  while (diff < 0) diff += 2 * Math.PI;
-  while (diff > 2 * Math.PI) diff -= 2 * Math.PI;
-
-  const extraSpins = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
-  const finalAngle = currentAngle + diff + extraSpins;
-  const duration = 4500;
-  const start = performance.now();
-  const startAngle = currentAngle;
-
-  function animate(now) {
-    const elapsed = now - start;
-    const progress = Math.min(elapsed / duration, 1);
-    const ease = 1 - Math.pow(1 - progress, 4);
-    currentAngle = startAngle + (finalAngle - startAngle) * ease;
-
-    // Highlight sector under arrow during spin
-    const highlight = getSectorUnderArrow(currentAngle);
-    drawWheel(currentAngle, highlight);
-
-    if (progress < 1) {
-      requestAnimationFrame(animate);
-    } else {
-      isSpinning = false;
-
-      // Final draw with winning sector highlighted
-      drawWheel(currentAngle, index);
-
-      // Get wheel center in screen coords
-      const rect = canvas.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const winColor = colors[index % colors.length];
-
-      // Save to history
-      db.ref("history").push({ value: options[index].label, time: Date.now() });
-
-      // Wait a moment to show the highlight, then explode
-      setTimeout(() => {
-        // Hide wheel
-        wheelWrap.classList.remove("visible");
-
-        // Spawn particles from wheel center
-        spawnExplosion(cx, cy, winColor);
-        animateParticles();
-
-        // After brief explosion, scatter to form text
-        setTimeout(() => {
-          scatterToText(options[index].label);
-        }, 900);
-
-        // Show text result underneath after particles gather
-        setTimeout(() => {
-          spinResult.innerText = "";
-          spinResult.style.opacity = "1";
-        }, 2200);
-
-        // Cleanup
-        hideTimer = setTimeout(() => {
-          spinResult.style.opacity = "0";
-          particles = [];
-          if (particleAnimId) cancelAnimationFrame(particleAnimId);
-          pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-          if (onDone) onDone();
-        }, 7000);
-
-      }, 1200);
-    }
-  }
-  requestAnimationFrame(animate);
-}
-
-function processQueue() {
-  if (processingQueue || spinQueue.length === 0) return;
-  processingQueue = true;
-  const index = spinQueue.shift();
-  wheelWrap.classList.add("visible");
-  spinTo(index, () => {
-    processingQueue = false;
-    if (spinQueue.length > 0) setTimeout(processQueue, 500);
-  });
-}
-
-drawWheel(0);
-
 let lastTs = 0;
 db.ref("spinCommand").on("value", snap => {
   const data = snap.val();
   if (!data || data.ts === lastTs) return;
   lastTs = data.ts;
-  const index = options.findIndex(o => o.label === data.label);
-  if (index !== -1) {
-    setTimeout(() => {
-      spinQueue.push(index);
-      processQueue();
-    }, isSpinning ? 0 : 10000);
-  }
+  const idx = options.findIndex(o => o.label === data.label);
+  if (idx !== -1) setTimeout(() => { spinQueue.push(idx); processQueue(); }, isSpinning ? 0 : 10000);
 });
 
 db.ref("donateTotal").on("value", snap => {
