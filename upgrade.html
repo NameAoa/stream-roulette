@@ -108,6 +108,8 @@ let isSpinning = false, hideTimer = null;
 let spinQueue = [], processingQueue = false;
 let particles = [], particleAnimId = null;
 let lastArrowSector = -1;
+let dissolveProgress = 0; // 0 → 1
+let dissolving = false;
 
 // ─── Spring Arrow ─────────────────────────────────────────────────────────────
 const spring = { angle: 0, vel: 0, stiffness: 0.30, damping: 0.52 };
@@ -187,6 +189,7 @@ function lighten(hex, amt) {
 
 // ─── Draw wheel ───────────────────────────────────────────────────────────────
 function drawWheel(angle, hlIdx = -1) {
+  const dissolveY = H * dissolveProgress;
   const W = wheelCanvas.width, H = wheelCanvas.height;
   const cx = W / 2, cy = H / 2, R = cx - 5;
   wCtx.clearRect(0, 0, W, H);
@@ -220,8 +223,18 @@ function drawWheel(angle, hlIdx = -1) {
     wCtx.moveTo(cx, cy);
     wCtx.arc(cx, cy, R, sa, ea);
     wCtx.closePath();
+
+    // КЛИП по высоте (распад сверху вниз)
+    wCtx.save();
+    wCtx.clip();
+
+    // “срезаем” верхнюю часть
+    wCtx.clearRect(0, 0, W, dissolveY);
+
     wCtx.fillStyle = g;
     wCtx.fill();
+
+    wCtx.restore();
 
     // Sector divider
     wCtx.globalAlpha = isHl ? 0.85 : 0.22;
@@ -357,18 +370,19 @@ class Particle {
   }
 
   if (this.phase === "fall") {
-    this.vy += this.grav;
-    this.vx *= this.fric;
 
-    this.x  += this.vx;
-    this.y  += this.vy;
+  // вниз сильнее, чем в стороны
+  this.vy += this.grav * 1.5;
+  this.vx *= 0.96;
 
-    this.rot += this.rotV;
+  this.x += this.vx;
+  this.y += this.vy;
 
-    // плавное исчезновение сверху вниз
-    if (this.y > pCanvas.height * 0.6) {
-      this.alpha *= 0.995;
-    }
+  // легкое сужение потока к центру
+  const centerX = pCanvas.width / 2;
+  this.x += (centerX - this.x) * 0.002;
+
+}
 
   } else {
     const dx = this.tx - this.x;
@@ -397,7 +411,7 @@ class Particle {
 function spawnWheelSand(wCx, wCy) {
   particles = [];
   const R   = 205;
-  const N   = 2500;
+  const N   = 10000;
   const arcs = getArcs();
 
   // Weighted colour palette
@@ -417,7 +431,7 @@ function spawnWheelSand(wCx, wCy) {
 // чем выше точка — тем раньше падает
     const normY = (py - (wCy - R)) / (R * 2);
     const col = palette[i % palette.length];
-    const sz  = 0.6 + Math.random() * 1.8;
+    const sz  = 0.4 + Math.random() * 1.2;
     const p = new Particle(px, py, col, sz);
     p.delay = normY * 80; // сверху раньше, снизу позже
     particles.push(p);
@@ -425,9 +439,10 @@ function spawnWheelSand(wCx, wCy) {
 }
 
 function setGatherTargets(label, wCy) {
-  const cx   = pCanvas.width  / 2;
-  // Text sits roughly where the spinResult div would be (just below wheel centre)
-  const textCy = wCy + 50;
+  const cx = pCanvas.width / 2;
+
+// фиксированная зона снизу (не зависит от колеса)
+  const textCy = pCanvas.height - 120;
 
   const targets = buildTextTargets(label, cx, textCy);
   if (!targets.length) return;
@@ -446,7 +461,7 @@ function setGatherTargets(label, wCy) {
 
   // Spawn extras if text needs more dots than we have
   for (let i = particles.length; i < targets.length; i++) {
-    const ep = new Particle(cx, wCy - 60, "#fff", 2);
+    const ep = new Particle(cx, pCanvas.height - 200, "#fff", 1);
     ep.phase = "gather";
     ep.tx    = targets[i].x;
     ep.ty    = targets[i].y;
@@ -519,22 +534,43 @@ function spinTo(idx, onDone) {
 
     // Show winning highlight briefly, then dissolve into sand
     setTimeout(() => {
-      wheelWrap.classList.remove("visible");
+
+      dissolving = true;
+      dissolveProgress = 0;
 
       spawnWheelSand(wCx, wCy);
       runParticles();
 
-      // Sand falls for 1 s, then gathers into text
-      setTimeout(() => { setGatherTargets(options[idx].label, wCy); }, 1000);
+      const dissolveStart = performance.now();
 
-      // Clean up after 8 s
+      function dissolveFrame(now) {
+        const t = (now - dissolveStart) / 2000; // длительность распада
+        dissolveProgress = Math.min(t, 1);
+
+        drawWheel(currentAngle, idx);
+
+        if (t < 1) {
+          requestAnimationFrame(dissolveFrame);
+        } else {
+          dissolving = false;
+        }
+      }
+
+      requestAnimationFrame(dissolveFrame);
+
+      // спустя время частицы начинают собираться в текст
+      setTimeout(() => {
+        setGatherTargets(options[idx].label, wCy);
+      }, 1800);
+
       hideTimer = setTimeout(() => {
         spinResult.style.opacity = "0";
         particles = [];
-        if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
+        if (particleAnimId) cancelAnimationFrame(particleAnimId);
         pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
         if (onDone) onDone();
-      }, 8000);
+      }, 9000);
+
     }, 1400);
   }
   requestAnimationFrame(frame);
