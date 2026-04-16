@@ -187,7 +187,7 @@ function lighten(hex, amt) {
 
 // ─── Draw wheel ───────────────────────────────────────────────────────────────
 function drawWheel(angle, hlIdx = -1) {
-  const dissolveY = H * dissolveProgress;
+
   const W = wheelCanvas.width, H = wheelCanvas.height;
   const cx = W / 2, cy = H / 2, R = cx - 5;
   wCtx.clearRect(0, 0, W, H);
@@ -221,19 +221,8 @@ function drawWheel(angle, hlIdx = -1) {
     wCtx.moveTo(cx, cy);
     wCtx.arc(cx, cy, R, sa, ea);
     wCtx.closePath();
-
-    // КЛИП по высоте (распад сверху вниз)
-    wCtx.save();
-    wCtx.clip();
-
-    // “срезаем” верхнюю часть
-    wCtx.clearRect(0, 0, W, dissolveY);
-
     wCtx.fillStyle = g;
     wCtx.fill();
-
-    wCtx.restore();
-
     // Sector divider
     wCtx.globalAlpha = isHl ? 0.85 : 0.22;
     wCtx.strokeStyle = isHl ? "rgba(255,230,255,1)" : "rgba(255,255,255,1)";
@@ -277,58 +266,30 @@ function drawWheel(angle, hlIdx = -1) {
 
 // Returns array of {x,y} screen coords where the text is rendered
 function buildTextTargets(label, centerX, centerY) {
-  const W = 900, H = 260;
+  const W = 900, H = 180;
   const off = document.createElement("canvas");
-  off.width = W;
-  off.height = H;
+  off.width = W; off.height = H;
   const oc = off.getContext("2d");
 
-  let words = label.split(" ");
-  let lines = [];
-  let current = "";
-
-  let fs = 90;
-
-  function fits(text) {
-    oc.font = `bold ${fs}px 'Poiret One'`;
-    return oc.measureText(text).width < W - 60;
-  }
-
-  // перенос строк
-  for (let w of words) {
-    let test = current ? current + " " + w : w;
-    if (fits(test)) {
-      current = test;
-    } else {
-      lines.push(current);
-      current = w;
-    }
-  }
-  if (current) lines.push(current);
-
-  // если всё равно слишком жирно — уменьшаем шрифт
-  while (lines.some(line => !fits(line)) && fs > 28) {
+  // Auto-fit font size
+  let fs = 100;
+  oc.font = `bold ${fs}px 'Poiret One', sans-serif`;
+  while (oc.measureText(label).width > W - 30 && fs > 24) {
     fs -= 4;
+    oc.font = `bold ${fs}px 'Poiret One', sans-serif`;
   }
 
-  oc.font = `bold ${fs}px 'Poiret One'`;
-  oc.fillStyle = "#ffffff";
-  oc.textAlign = "center";
-  oc.textBaseline = "middle";
-
-  const lineHeight = fs * 1.2;
-  const startY = H / 2 - ((lines.length - 1) * lineHeight) / 2;
-
-  lines.forEach((line, i) => {
-    oc.fillText(line, W / 2, startY + i * lineHeight);
-  });
+  oc.fillStyle     = "#fff";
+  oc.textAlign     = "center";
+  oc.textBaseline  = "middle";
+  oc.fillText(label, W / 2, H / 2);
 
   const data = oc.getImageData(0, 0, W, H).data;
-  const pts = [];
-
-  for (let y = 0; y < H; y += 3) { // плотнее точки
-    for (let x = 0; x < W; x += 3) {
-      if (data[(y * W + x) * 4 + 3] > 120) {
+  const pts  = [];
+  // Sample every 5px — dense enough and still readable
+  for (let y = 0; y < H; y += 5) {
+    for (let x = 0; x < W; x += 5) {
+      if (data[(y * W + x) * 4 + 3] > 100) {
         pts.push({
           x: centerX + (x - W / 2),
           y: centerY + (y - H / 2)
@@ -336,7 +297,6 @@ function buildTextTargets(label, centerX, centerY) {
       }
     }
   }
-
   return pts;
 }
 
@@ -348,7 +308,6 @@ class Particle {
     this.alpha = 1;
     this.phase = "fall";
     this.tx = 0; this.ty = 0;
-    this.delay = Math.random() * 60; // задержка старта
 
     // Outward burst + gravity
     const ang = Math.random() * Math.PI * 2;
@@ -362,36 +321,22 @@ class Particle {
   }
 
   update() {
-  if (this.delay > 0) {
-    this.delay--;
-    return;
-  }
-
-  if (this.phase === "fall") {
-    this.vy += this.grav;
-    this.vx *= this.fric;
-
-    this.x  += this.vx;
-    this.y  += this.vy;
-
-    this.rot += this.rotV;
-
-    // плавное исчезновение сверху вниз
-    if (this.y > pCanvas.height * 0.6) {
-      this.alpha *= 0.995;
+    if (this.phase === "fall") {
+      this.vy += this.grav;
+      this.vx *= this.fric;
+      this.x  += this.vx;
+      this.y  += this.vy;
+      this.rot += this.rotV;
+      // don't auto-fade during fall so they look like drifting sand
+    } else {
+      const dx = this.tx - this.x, dy = this.ty - this.y;
+      this.x  += dx * 0.06;
+      this.y  += dy * 0.06;
+      this.alpha = Math.min(1, this.alpha + 0.018);
+      this.size  = Math.max(1, this.size * 0.993);
+      this.rot   += this.rotV * 0.3;
     }
-
-  } else {
-    const dx = this.tx - this.x;
-    const dy = this.ty - this.y;
-
-    this.x += dx * 0.08;
-    this.y += dy * 0.08;
-
-    this.alpha = 1; // БЕЗ прозрачности
-    this.size  *= 0.995;
   }
-}
 
   draw() {
     if (this.alpha <= 0.01) return;
@@ -408,7 +353,7 @@ class Particle {
 function spawnWheelSand(wCx, wCy) {
   particles = [];
   const R   = 205;
-  const N   = 10000;
+  const N   = 600;
   const arcs = getArcs();
 
   // Weighted colour palette
@@ -424,22 +369,16 @@ function spawnWheelSand(wCx, wCy) {
     const ang = Math.random() * Math.PI * 2;
     const px  = wCx + r * Math.cos(ang);
     const py  = wCy + r * Math.sin(ang);
-
-// чем выше точка — тем раньше падает
-    const normY = (py - (wCy - R)) / (R * 2);
     const col = palette[i % palette.length];
-    const sz  = 0.4 + Math.random() * 1.2;
-    const p = new Particle(px, py, col, sz);
-    p.delay = normY * 80; // сверху раньше, снизу позже
-    particles.push(p);
+    const sz  = 1.5 + Math.random() * 4;
+    particles.push(new Particle(px, py, col, sz));
   }
 }
 
 function setGatherTargets(label, wCy) {
-  const cx = pCanvas.width / 2;
-
-// фиксированная зона снизу (не зависит от колеса)
-  const textCy = pCanvas.height - 120;
+  const cx   = pCanvas.width  / 2;
+  // Text sits roughly where the spinResult div would be (just below wheel centre)
+  const textCy = wCy + 50;
 
   const targets = buildTextTargets(label, cx, textCy);
   if (!targets.length) return;
@@ -452,7 +391,7 @@ function setGatherTargets(label, wCy) {
       p.phase = "gather";
       p.color = "#fff";
     } else {
-      p.alpha = 0.02; // dismiss extras
+      p.alpha = 0; // dismiss extras
     }
   });
 
@@ -462,7 +401,7 @@ function setGatherTargets(label, wCy) {
     ep.phase = "gather";
     ep.tx    = targets[i].x;
     ep.ty    = targets[i].y;
-    ep.alpha = 0.2;
+    ep.alpha = 0.05;
     particles.push(ep);
   }
 }
@@ -531,43 +470,22 @@ function spinTo(idx, onDone) {
 
     // Show winning highlight briefly, then dissolve into sand
     setTimeout(() => {
-
-      dissolving = true;
-      dissolveProgress = 0;
+      wheelWrap.classList.remove("visible");
 
       spawnWheelSand(wCx, wCy);
       runParticles();
 
-      const dissolveStart = performance.now();
+      // Sand falls for 1 s, then gathers into text
+      setTimeout(() => { setGatherTargets(options[idx].label, wCy); }, 1000);
 
-      function dissolveFrame(now) {
-        const t = (now - dissolveStart) / 2000; // длительность распада
-        dissolveProgress = Math.min(t, 1);
-
-        drawWheel(currentAngle, idx);
-
-        if (t < 1) {
-          requestAnimationFrame(dissolveFrame);
-        } else {
-          dissolving = false;
-        }
-      }
-
-      requestAnimationFrame(dissolveFrame);
-
-      // спустя время частицы начинают собираться в текст
-      setTimeout(() => {
-        setGatherTargets(options[idx].label, wCy);
-      }, 1800);
-
+      // Clean up after 8 s
       hideTimer = setTimeout(() => {
         spinResult.style.opacity = "0";
         particles = [];
-        if (particleAnimId) cancelAnimationFrame(particleAnimId);
+        if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
         pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
         if (onDone) onDone();
-      }, 9000);
-
+      }, 8000);
     }, 1400);
   }
   requestAnimationFrame(frame);
