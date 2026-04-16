@@ -108,8 +108,6 @@ let isSpinning = false, hideTimer = null;
 let spinQueue = [], processingQueue = false;
 let particles = [], particleAnimId = null;
 let lastArrowSector = -1;
-let dissolveProgress = 0; // 0 → 1
-let dissolving = false;
 
 // ─── Spring Arrow ─────────────────────────────────────────────────────────────
 const spring = { angle: 0, vel: 0, stiffness: 0.30, damping: 0.52 };
@@ -189,8 +187,8 @@ function lighten(hex, amt) {
 
 // ─── Draw wheel ───────────────────────────────────────────────────────────────
 function drawWheel(angle, hlIdx = -1) {
-  const W = wheelCanvas.width, H = wheelCanvas.height;
   const dissolveY = H * dissolveProgress;
+  const W = wheelCanvas.width, H = wheelCanvas.height;
   const cx = W / 2, cy = H / 2, R = cx - 5;
   wCtx.clearRect(0, 0, W, H);
 
@@ -228,15 +226,12 @@ function drawWheel(angle, hlIdx = -1) {
     wCtx.save();
     wCtx.clip();
 
-    // рисуем сектор
+    // “срезаем” верхнюю часть
+    wCtx.clearRect(0, 0, W, dissolveY);
+
     wCtx.fillStyle = g;
     wCtx.fill();
 
-    // “срезаем” верх через прозрачность
-    wCtx.globalCompositeOperation = "destination-out";
-    wCtx.fillRect(0, 0, W, dissolveY);
-
-    wCtx.globalCompositeOperation = "source-over";
     wCtx.restore();
 
     // Sector divider
@@ -373,27 +368,28 @@ class Particle {
   }
 
   if (this.phase === "fall") {
+    this.vy += this.grav;
+    this.vx *= this.fric;
 
-    this.vy += this.grav * 1.5;
-    this.vx *= 0.96;
+    this.x  += this.vx;
+    this.y  += this.vy;
 
-    this.x += this.vx;
-    this.y += this.vy;
+    this.rot += this.rotV;
 
-    const centerX = pCanvas.width / 2;
-    this.x += (centerX - this.x) * 0.002;
+    // плавное исчезновение сверху вниз
+    if (this.y > pCanvas.height * 0.6) {
+      this.alpha *= 0.995;
+    }
 
   } else {
-
     const dx = this.tx - this.x;
     const dy = this.ty - this.y;
 
     this.x += dx * 0.08;
     this.y += dy * 0.08;
 
-    this.alpha = 1;
-    this.size *= 0.995;
-
+    this.alpha = 1; // БЕЗ прозрачности
+    this.size  *= 0.995;
   }
 }
 
@@ -412,7 +408,7 @@ class Particle {
 function spawnWheelSand(wCx, wCy) {
   particles = [];
   const R   = 205;
-  const N   = 6000;
+  const N   = 10000;
   const arcs = getArcs();
 
   // Weighted colour palette
@@ -462,7 +458,7 @@ function setGatherTargets(label, wCy) {
 
   // Spawn extras if text needs more dots than we have
   for (let i = particles.length; i < targets.length; i++) {
-    const ep = new Particle(cx, pCanvas.height - 200, "#fff", 1);
+    const ep = new Particle(cx, wCy - 60, "#fff", 2);
     ep.phase = "gather";
     ep.tx    = targets[i].x;
     ep.ty    = targets[i].y;
