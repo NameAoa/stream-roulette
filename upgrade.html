@@ -2,13 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>OBS Roulette FINAL</title>
+<title>OBS Roulette</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet">
 
 <style>
-body {
-  margin:0;
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body{
   background:transparent;
   display:flex;
   flex-direction:column;
@@ -16,30 +17,49 @@ body {
   justify-content:center;
   height:100vh;
   overflow:hidden;
-  font-family:'Poiret One';
 }
 
-#wheelWrap {
+.scale-wrap{
+  width:380px;
+  opacity:0;
+  transition:0.4s;
+  margin-bottom:12px;
+}
+.scale-wrap.visible{opacity:1;}
+
+.scale-label{
+  color:#fff;
+  font-size:32px;
+  font-family:'Poiret One';
+  text-align:center;
+  text-shadow:0 0 12px rgba(140,80,200,0.8);
+}
+
+.wheel-wrap{
   position:relative;
   width:420px;
   height:420px;
+  opacity:0;
+  transform:scale(0.8);
+  transition:0.5s;
+}
+.wheel-wrap.visible{
+  opacity:1;
+  transform:scale(1);
 }
 
-#particleCanvas {
+#particleCanvas{
   position:fixed;
-  top:0; left:0;
-  width:100%; height:100%;
+  top:0;left:0;
+  width:100%;height:100%;
   pointer-events:none;
 }
 
-#label {
-  position:absolute;
-  bottom:40px;
-  width:100%;
-  text-align:center;
-  font-size:42px;
+#spinResult{
+  margin-top:16px;
+  font-size:48px;
   color:#fff;
-  text-shadow:0 0 20px rgba(180,100,255,1);
+  opacity:0;
 }
 </style>
 </head>
@@ -48,280 +68,114 @@ body {
 
 <canvas id="particleCanvas"></canvas>
 
-<div id="wheelWrap">
+<div class="scale-wrap" id="scaleWrap">
+  <div class="scale-label" id="scaleLabel">Колесо 0/150</div>
+</div>
+
+<div class="wheel-wrap" id="wheelWrap">
   <canvas id="wheel" width="420" height="420"></canvas>
 </div>
 
-<div id="label"></div>
+<div id="spinResult"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-// 🔥 Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
-  authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
-  databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
-  projectId: "roulette-twitch-2c7a3"
-};
 
-firebase.initializeApp(firebaseConfig);
+// Firebase
+firebase.initializeApp({
+  apiKey:"AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+  authDomain:"roulette-twitch-2c7a3.firebaseapp.com",
+  databaseURL:"https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+  projectId:"roulette-twitch-2c7a3"
+});
+
 const db = firebase.database();
 
-// 🎨 Canvas
+// Canvas
 const wheel = document.getElementById("wheel");
 const ctx = wheel.getContext("2d");
 
-const pCanvas = document.getElementById("particleCanvas");
-const pCtx = pCanvas.getContext("2d");
+// UI
+const scaleLabel = document.getElementById("scaleLabel");
+const scaleWrap = document.getElementById("scaleWrap");
+const wheelWrap = document.getElementById("wheelWrap");
 
-pCanvas.width = window.innerWidth;
-pCanvas.height = window.innerHeight;
-
-const label = document.getElementById("label");
-
-// ⚙️ State
+// State
 let options = [];
+let goal = 150;
 let angle = 0;
-let particles = [];
-let dissolving = false;
-let dissolveY = 0;
 
-// 🎡 Draw wheel
-function drawWheel() {
+// Colors
+const COLORS = ["#3d1a6e","#5a2d91","#7b4fa6","#9d6dbf"];
+
+// FIXED lighten
+function lighten(hex, amt){
+  const n = parseInt(hex.slice(1),16);
+  return `rgb(
+    ${Math.min(255,(n>>16)+amt)},
+    ${Math.min(255,((n>>8)&255)+amt)},
+    ${Math.min(255,(n&255)+amt)}
+  )`;
+}
+
+// Draw wheel
+function drawWheel(){
   const W = wheel.width;
   const H = wheel.height;
-  const cx = W/2, cy = H/2;
-  const R = cx - 5;
 
   ctx.clearRect(0,0,W,H);
 
   if(!options.length) return;
 
-  let step = (Math.PI*2)/options.length;
+  const total = options.length;
+  const arc = (Math.PI*2)/total;
 
   for(let i=0;i<options.length;i++){
-    let a = angle + i*step;
 
     ctx.beginPath();
-    ctx.moveTo(cx,cy);
-    ctx.arc(cx,cy,R,a,a+step);
+    ctx.moveTo(W/2,H/2);
+    ctx.arc(W/2,H/2,W/2-5,i*arc,(i+1)*arc);
     ctx.closePath();
 
-    ctx.fillStyle = `hsl(${i*60},60%,50%)`;
+    ctx.fillStyle = COLORS[i % COLORS.length];
     ctx.fill();
-  }
 
-  // 🔥 шумный распад
-  if(dissolving){
-    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle="#fff";
+    ctx.font="14px Poiret One";
+    ctx.textAlign="center";
 
-    for(let x=0;x<W;x+=4){
-      let noise = Math.random()*30;
-      ctx.fillRect(x,0,4,dissolveY + noise);
-    }
+    const mid = i*arc + arc/2;
+    const x = W/2 + Math.cos(mid)*120;
+    const y = H/2 + Math.sin(mid)*120;
 
-    ctx.globalCompositeOperation = "source-over";
+    ctx.fillText(options[i].label,x,y);
   }
 }
 
-// 🧩 Particle
-class Particle{
-  constructor(x,y,color){
-    this.x=x;
-    this.y=y;
-    this.color=color;
-    this.vx=(Math.random()-0.5)*1;
-    this.vy=Math.random()*2+2;
-    this.size=Math.random()*1+0.5;
-    this.tx=0;
-    this.ty=0;
-    this.phase="fall";
-  }
-
-  update(){
-    if(this.phase==="fall"){
-      this.x+=this.vx;
-      this.y+=this.vy;
-
-      // лёгкое притяжение вниз к зоне текста
-      let targetY = pCanvas.height - 140;
-      this.y += (targetY - this.y) * 0.01;
-
-    } else {
-      this.x += (this.tx-this.x)*0.08;
-      this.y += (this.ty-this.y)*0.08;
-    }
-  }
-
-  draw(){
-    pCtx.fillStyle=this.color;
-    pCtx.fillRect(this.x,this.y,this.size,this.size);
-  }
-}
-
-// 🔥 создаём частицы ИЗ КОЛЕСА
-function spawnParticlesFromWheel(){
-  particles=[];
-
-  const rect = wheel.getBoundingClientRect();
-
-  const img = ctx.getImageData(0,0,wheel.width,wheel.height).data;
-
-  for(let y=0;y<wheel.height;y+=3){
-    for(let x=0;x<wheel.width;x+=3){
-
-      let i = (y*wheel.width + x)*4;
-
-      if(img[i+3] > 100){ // есть пиксель
-        let px = rect.left + x;
-        let py = rect.top + y;
-
-        let color = `rgb(${img[i]},${img[i+1]},${img[i+2]})`;
-
-        particles.push(new Particle(px,py,color));
-      }
-    }
-  }
-}
-
-// 📝 текст
-function buildTextTargets(text){
-  const off = document.createElement("canvas");
-  off.width = 800;
-  off.height = 240;
-  const oc = off.getContext("2d");
-
-  let words = text.split(" ");
-  let lines = [];
-  let current = "";
-
-  let fs = 70;
-
-  function fits(t){
-    oc.font = `bold ${fs}px Poiret One`;
-    return oc.measureText(t).width < 760;
-  }
-
-  for(let w of words){
-    let test = current ? current+" "+w : w;
-    if(fits(test)) current=test;
-    else{
-      lines.push(current);
-      current=w;
-    }
-  }
-  if(current) lines.push(current);
-
-  while(lines.some(l=>!fits(l)) && fs>30){
-    fs-=4;
-  }
-
-  oc.font = `bold ${fs}px Poiret One`;
-  oc.fillStyle="#fff";
-  oc.textAlign="center";
-
-  let lh = fs*1.2;
-  let startY = 120 - (lines.length-1)*lh/2;
-
-  lines.forEach((l,i)=>{
-    oc.fillText(l,400,startY + i*lh);
-  });
-
-  let data = oc.getImageData(0,0,800,240).data;
-  let pts=[];
-
-  for(let y=0;y<240;y+=3){
-    for(let x=0;x<800;x+=3){
-      if(data[(y*800+x)*4+3]>120){
-        pts.push({
-          x: pCanvas.width/2 + (x-400),
-          y: pCanvas.height - 120 + (y-120)
-        });
-      }
-    }
-  }
-
-  return pts;
-}
-
-// 🎯 сбор текста
-function gather(text){
-  let pts = buildTextTargets(text);
-
-  particles.forEach((p,i)=>{
-    if(i<pts.length){
-      p.tx=pts[i].x;
-      p.ty=pts[i].y;
-      p.phase="gather";
-      p.color="#fff";
-    }
-  });
-}
-
-// 🎞 loop
-function loop(){
-  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
-
-  particles.forEach(p=>{
-    p.update();
-    p.draw();
-  });
-
-  requestAnimationFrame(loop);
-}
-loop();
-
-// 🎡 spin
-function spinTo(labelText){
-
-  spawnParticlesFromWheel();
-
-  dissolving = true;
-  dissolveY = 0;
-
-  let t=0;
-
-  function anim(){
-    t+=0.02;
-    dissolveY = Math.min(t * wheel.height, wheel.height);
-
-    drawWheel();
-
-    if(t<1){
-      requestAnimationFrame(anim);
-    } else {
-      setTimeout(()=>{
-        gather(labelText);
-      },600);
-    }
-  }
-
-  anim();
-}
-
-// 🔥 Firebase listeners
-drawWheel();
-
-db.ref("options").on("value", snap=>{
+// Firebase listeners
+db.ref("options").on("value",snap=>{
   if(snap.val()){
     options = snap.val();
     drawWheel();
   }
 });
 
-let lastTs=0;
-
-db.ref("spinCommand").on("value", snap=>{
-  const data = snap.val();
-  if(!data || data.ts === lastTs) return;
-
-  lastTs = data.ts;
-
-  spinTo(data.label);
+db.ref("goal").on("value",snap=>{
+  if(snap.val()) goal = snap.val();
 });
-</script>
 
+db.ref("donateTotal").on("value",snap=>{
+  const total = snap.val() || 0;
+
+  scaleLabel.innerText = `Колесо ${total}/${goal}`;
+  scaleWrap.classList.add("visible");
+});
+
+// show wheel
+wheelWrap.classList.add("visible");
+
+</script>
 </body>
 </html>
