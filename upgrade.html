@@ -30,53 +30,38 @@
       transition: opacity 0.5s ease, transform 0.5s ease;
     }
     .wheel-wrap.visible { opacity: 1; transform: scale(1); }
-    canvas {
-      border-radius: 50%;
-      box-shadow: 0 0 40px rgba(140,80,200,0.6);
+    #wheel { display: block; }
+    #particleCanvas {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 100;
     }
-    .arrow-wrap {
-      position: absolute; top: -18px; left: 50%;
+    #arrowCanvas {
+      position: absolute; top: -22px; left: 50%;
       transform: translateX(-50%);
       z-index: 10;
-      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.8));
     }
-    .arrow-wrap svg { width: 36px; height: 52px; }
     #spinResult {
-      margin-top: 16px;
-      min-height: 90px;
-      font-size: 36px;
-      font-family: 'Poiret One', cursive;
+      margin-top: 16px; min-height: 90px;
+      font-size: 48px; font-family: 'Poiret One', cursive;
       color: #fff;
-      text-shadow: 0 0 20px rgba(140,80,200,0.9);
-      letter-spacing: 3px;
-      opacity: 0;
-      transition: opacity 0.5s;
-      text-align: center;
+      text-shadow: 0 0 30px rgba(180,100,255,1), 0 0 60px rgba(140,80,200,0.7);
+      letter-spacing: 4px; opacity: 0;
+      text-align: center; position: relative; z-index: 200;
+      transition: opacity 0.6s;
     }
-    #spinResult.visible { opacity: 1; }
   </style>
 </head>
 <body>
+
+<canvas id="particleCanvas"></canvas>
 
 <div class="scale-wrap" id="scaleWrap">
   <div class="scale-label" id="scaleLabel">Колесо 0/150</div>
 </div>
 
 <div class="wheel-wrap" id="wheelWrap">
-  <div class="arrow-wrap">
-    <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" style="stop-color:#666"/>
-          <stop offset="30%" style="stop-color:#ddd"/>
-          <stop offset="60%" style="stop-color:#aaa"/>
-          <stop offset="100%" style="stop-color:#555"/>
-        </linearGradient>
-      </defs>
-      <polygon points="18,52 0,4 36,4" fill="url(#metalGrad)"/>
-      <rect x="6" y="0" width="24" height="8" rx="2" fill="url(#metalGrad)" stroke="#333" stroke-width="1"/>
-    </svg>
-  </div>
+  <canvas id="arrowCanvas" width="40" height="62"></canvas>
   <canvas id="wheel" width="420" height="420"></canvas>
 </div>
 
@@ -85,6 +70,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
+// ─── Firebase ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
   authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
@@ -94,148 +80,263 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ─── Canvas ───────────────────────────────────────
+// ─── Palette ──────────────────────────────────────────────────────────────────
+const COLORS = [
+  "#3d1a6e","#5a2d91","#7b4fa6","#9d6dbf",
+  "#4a2278","#6b3d9e","#8c5ab5","#b07fd4"
+];
+
+// ─── Elements ─────────────────────────────────────────────────────────────────
 const wheelCanvas = document.getElementById("wheel");
-const wCtx = wheelCanvas.getContext("2d");
+const wCtx        = wheelCanvas.getContext("2d");
+const arrowCanvas = document.getElementById("arrowCanvas");
+const aCtx        = arrowCanvas.getContext("2d");
+const pCanvas     = document.getElementById("particleCanvas");
+const pCtx        = pCanvas.getContext("2d");
+const wheelWrap   = document.getElementById("wheelWrap");
+const scaleWrap   = document.getElementById("scaleWrap");
+const scaleLabel  = document.getElementById("scaleLabel");
+const spinResult  = document.getElementById("spinResult");
 
-const pCanvas = document.getElementById("particleCanvas");
-const pCtx = pCanvas.getContext("2d");
+function resizeP() { pCanvas.width = window.innerWidth; pCanvas.height = window.innerHeight; }
+resizeP();
+window.addEventListener("resize", resizeP);
 
-const scaleLabel = document.getElementById("scaleLabel");
-const scaleWrap = document.getElementById("scaleWrap");
-const wheelWrap = document.getElementById("wheelWrap");
+// ─── State ────────────────────────────────────────────────────────────────────
+let options = [], goal = 150, currentAngle = 0;
+let isSpinning = false, hideTimer = null;
+let spinQueue = [], processingQueue = false;
+let particles = [], particleAnimId = null;
+let lastArrowSector = -1;
+let dissolveProgress = 0; // 0 → 1
+let dissolving = false;
 
-// resize particles canvas
-function resize() {
-  pCanvas.width = innerWidth;
-  pCanvas.height = innerHeight;
+// ─── Spring Arrow ─────────────────────────────────────────────────────────────
+const spring = { angle: 0, vel: 0, stiffness: 0.30, damping: 0.52 };
+
+function tickSpring() {
+  const f = -spring.stiffness * spring.angle - spring.damping * spring.vel;
+  spring.vel   += f;
+  spring.angle += spring.vel;
 }
-resize();
-addEventListener("resize", resize);
 
-// ─── STATE ────────────────────────────────────────
-let options = [];
-let goal = 150;
-let currentAngle = 0;
+function renderArrow() {
+  const W = arrowCanvas.width, H = arrowCanvas.height;
+  aCtx.clearRect(0, 0, W, H);
+  aCtx.save();
+  // Pivot = tip of arrow = bottom centre
+  aCtx.translate(W / 2, H - 4);
+  aCtx.rotate(spring.angle);
+  aCtx.translate(-W / 2, -(H - 4));
 
-let particles = [];
-let particleAnimId = null;
+  const grd = aCtx.createLinearGradient(0, 0, W, 0);
+  grd.addColorStop(0,   "#555");
+  grd.addColorStop(0.28,"#ddd");
+  grd.addColorStop(0.62,"#aaa");
+  grd.addColorStop(1,   "#555");
 
-let dissolveProgress = 0;
+  // Arrow triangle (tip down)
+  aCtx.beginPath();
+  aCtx.moveTo(W / 2, H - 4);   // tip
+  aCtx.lineTo(3,  10);
+  aCtx.lineTo(W - 3, 10);
+  aCtx.closePath();
+  aCtx.fillStyle   = grd;
+  aCtx.shadowColor = "rgba(0,0,0,0.65)";
+  aCtx.shadowBlur  = 7;
+  aCtx.fill();
 
-// ─── COLORS ───────────────────────────────────────
-const COLORS = ["#3d1a6e","#5a2d91","#7b4fa6","#9d6dbf"];
+  // Cap rectangle
+  aCtx.shadowBlur = 0;
+  aCtx.beginPath();
+  aCtx.roundRect(6, 1, W - 12, 12, 3);
+  aCtx.fillStyle   = grd;
+  aCtx.strokeStyle = "#333";
+  aCtx.lineWidth   = 1;
+  aCtx.fill();
+  aCtx.stroke();
 
-// ─── FIX 1: lighten ───────────────────────────────
-function lighten(hex, amt){
+  aCtx.restore();
+}
+
+function kickArrow() { spring.vel += (Math.random() > 0.5 ? 1 : -1) * 0.22; }
+
+(function arrowLoop() {
+  tickSpring();
+  renderArrow();
+  requestAnimationFrame(arrowLoop);
+})();
+
+// ─── Wheel helpers ────────────────────────────────────────────────────────────
+function getArcs() {
+  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
+  return options.map(o => ((o.weight || 1) / total) * Math.PI * 2);
+}
+
+function getSectorUnderArrow(angle) {
+  if (!options.length) return -1;
+  const arcs = getArcs();
+  const norm  = (((- Math.PI / 2) - angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  let cum = 0;
+  for (let i = 0; i < arcs.length; i++) { cum += arcs[i]; if (norm < cum) return i; }
+  return 0;
+}
+
+function lighten(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
-  return `rgb(${
-    Math.min(255, (n >> 16) + amt)
-  },${
-    Math.min(255, ((n >> 8) & 255) + amt)
-  },${
-    Math.min(255, (n & 255) + amt)
-  })`;
+  return `rgb(${Math.min(255,(n>>16)+amt)},${Math.min(255,((n>>8)&0xff)+amt)},${Math.min(255,(n&0xff)+amt)})`;
 }
 
-// ─── FIX 2: DRAW WHEEL ────────────────────────────
-function drawWheel(angle){
-  const W = wheelCanvas.width;
-  const H = wheelCanvas.height;
+// ─── Draw wheel ───────────────────────────────────────────────────────────────
+function drawWheel(angle, hlIdx = -1) {
+  const W = wheelCanvas.width, H = wheelCanvas.height;
+  const dissolveY = H * dissolveProgress;
+  const cx = W / 2, cy = H / 2, R = cx - 5;
+  wCtx.clearRect(0, 0, W, H);
 
-  const cx = W/2;
-  const cy = H/2;
-  const R  = cx - 5;
+  // Circular clip — eliminates any glow leaking outside
+  wCtx.save();
+  wCtx.beginPath();
+  wCtx.arc(cx, cy, R, 0, Math.PI * 2);
+  wCtx.clip();
 
-  wCtx.clearRect(0,0,W,H);
+  const arcs = getArcs();
+  let sa = angle;
+  for (let i = 0; i < options.length; i++) {
+    const ea  = sa + arcs[i];
+    const isHl = i === hlIdx;
+    const base = COLORS[i % COLORS.length];
 
-  if(!options.length) return;
+    wCtx.globalAlpha = (hlIdx !== -1 && !isHl) ? 0.35 : 1;
 
-  const total = options.length;
-  const arc = Math.PI*2/total;
-
-  let a = angle;
-
-  for(let i=0;i<options.length;i++){
-
-    const a2 = a + arc;
+    const g = wCtx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    if (isHl) {
+      g.addColorStop(0,    lighten(base, 130));
+      g.addColorStop(0.5,  lighten(base, 80));
+      g.addColorStop(1,    lighten(base, 40));
+    } else {
+      g.addColorStop(0, lighten(base, 50));
+      g.addColorStop(1, base);
+    }
 
     wCtx.beginPath();
-    wCtx.moveTo(cx,cy);
-    wCtx.arc(cx,cy,R,a,a2);
+    wCtx.moveTo(cx, cy);
+    wCtx.arc(cx, cy, R, sa, ea);
     wCtx.closePath();
 
-    wCtx.fillStyle = COLORS[i % COLORS.length];
+    // КЛИП по высоте (распад сверху вниз)
+    wCtx.save();
+    wCtx.clip();
+
+    // рисуем сектор
+    wCtx.fillStyle = g;
     wCtx.fill();
 
-    wCtx.strokeStyle = "rgba(255,255,255,0.3)";
-    wCtx.stroke();
+    // “срезаем” верх через прозрачность
+    wCtx.globalCompositeOperation = "destination-out";
+    wCtx.fillRect(0, 0, W, dissolveY);
 
-    // text
-    const mid = a + arc/2;
-
-    wCtx.save();
-    wCtx.translate(cx,cy);
-    wCtx.rotate(mid);
-    wCtx.fillStyle="#fff";
-    wCtx.font="14px Poiret One";
-    wCtx.textAlign="right";
-    wCtx.fillText(options[i].label, R-10, 5);
+    wCtx.globalCompositeOperation = "source-over";
     wCtx.restore();
 
-    a = a2;
+    // Sector divider
+    wCtx.globalAlpha = isHl ? 0.85 : 0.22;
+    wCtx.strokeStyle = isHl ? "rgba(255,230,255,1)" : "rgba(255,255,255,1)";
+    wCtx.lineWidth   = isHl ? 2.5 : 1.5;
+    wCtx.stroke();
+
+    sa = ea;
+  }
+  wCtx.restore(); // end clip
+
+  // Outer ring (outside clip so it's just a ring, not filled)
+  wCtx.save();
+  wCtx.beginPath();
+  wCtx.arc(cx, cy, R, 0, Math.PI * 2);
+  wCtx.strokeStyle = "rgba(170,100,255,0.5)";
+  wCtx.lineWidth   = 4;
+  wCtx.stroke();
+  wCtx.restore();
+
+  // Labels
+  sa = angle;
+  for (let i = 0; i < options.length; i++) {
+    const arc = arcs[i];
+    const isHl = i === hlIdx;
+    wCtx.save();
+    wCtx.globalAlpha = (hlIdx !== -1 && !isHl) ? 0.35 : 1;
+    wCtx.translate(cx, cy);
+    wCtx.rotate(sa + arc / 2);
+    wCtx.textAlign   = "right";
+    wCtx.fillStyle   = "#fff";
+    wCtx.font        = isHl ? "bold 14px 'Poiret One'" : "13px 'Poiret One'";
+    wCtx.shadowColor = "rgba(0,0,0,0.9)";
+    wCtx.shadowBlur  = 4;
+    wCtx.fillText(options[i].label, R - 14, 6);
+    wCtx.restore();
+    sa += arc;
   }
 }
 
-// ─── FIX 3: TEXT TARGETS ─────────────────────────
-function buildTextTargets(label, centerX, centerY){
+// ─── Particles ────────────────────────────────────────────────────────────────
 
+// Returns array of {x,y} screen coords where the text is rendered
+function buildTextTargets(label, centerX, centerY) {
   const W = 900, H = 260;
-
   const off = document.createElement("canvas");
   off.width = W;
   off.height = H;
   const oc = off.getContext("2d");
 
-  let fs = 70;
-
-  function fits(text){
-    oc.font = `bold ${fs}px 'Poiret One'`;
-    return oc.measureText(text).width < W-40;
-  }
-
-  const words = label.split(" ");
+  let words = label.split(" ");
   let lines = [];
-  let cur = "";
+  let current = "";
 
-  for(let w of words){
-    let test = cur ? cur+" "+w : w;
-    if(fits(test)) cur = test;
-    else { lines.push(cur); cur = w; }
+  let fs = 90;
+
+  function fits(text) {
+    oc.font = `bold ${fs}px 'Poiret One'`;
+    return oc.measureText(text).width < W - 60;
   }
-  if(cur) lines.push(cur);
+
+  // перенос строк
+  for (let w of words) {
+    let test = current ? current + " " + w : w;
+    if (fits(test)) {
+      current = test;
+    } else {
+      lines.push(current);
+      current = w;
+    }
+  }
+  if (current) lines.push(current);
+
+  // если всё равно слишком жирно — уменьшаем шрифт
+  while (lines.some(line => !fits(line)) && fs > 28) {
+    fs -= 4;
+  }
 
   oc.font = `bold ${fs}px 'Poiret One'`;
-  oc.fillStyle="#fff";
-  oc.textAlign="center";
-  oc.textBaseline="middle";
+  oc.fillStyle = "#ffffff";
+  oc.textAlign = "center";
+  oc.textBaseline = "middle";
 
-  const lh = fs*1.2;
-  const startY = H/2 - (lines.length*lh)/2;
+  const lineHeight = fs * 1.2;
+  const startY = H / 2 - ((lines.length - 1) * lineHeight) / 2;
 
-  lines.forEach((l,i)=>{
-    oc.fillText(l, W/2, startY + i*lh);
+  lines.forEach((line, i) => {
+    oc.fillText(line, W / 2, startY + i * lineHeight);
   });
 
-  const data = oc.getImageData(0,0,W,H).data;
+  const data = oc.getImageData(0, 0, W, H).data;
   const pts = [];
 
-  for(let y=0;y<H;y+=3){
-    for(let x=0;x<W;x+=3){
-      if(data[(y*W+x)*4+3] > 120){
+  for (let y = 0; y < H; y += 3) { // плотнее точки
+    for (let x = 0; x < W; x += 3) {
+      if (data[(y * W + x) * 4 + 3] > 120) {
         pts.push({
-          x: centerX + (x - W/2),
-          y: centerY + (y - H/2)
+          x: centerX + (x - W / 2),
+          y: centerY + (y - H / 2)
         });
       }
     }
@@ -244,91 +345,273 @@ function buildTextTargets(label, centerX, centerY){
   return pts;
 }
 
-// ─── PARTICLES ───────────────────────────────────
-class Particle{
-  constructor(x,y,color){
-    this.x=x;
-    this.y=y;
-    this.color=color;
-    this.vx=(Math.random()-0.5)*4;
-    this.vy=-Math.random()*4;
-    this.gravity=0.15;
-    this.alpha=1;
-    this.phase="fall";
+class Particle {
+  constructor(x, y, color, sz) {
+    this.x = x; this.y = y;
+    this.color = color;
+    this.size  = sz || (2 + Math.random() * 4);
+    this.alpha = 1;
+    this.phase = "fall";
+    this.tx = 0; this.ty = 0;
+    this.delay = Math.random() * 60; // задержка старта
+
+    // Outward burst + gravity
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 1 + Math.random() * 7;
+    this.vx  = Math.cos(ang) * spd;
+    this.vy  = -1 - Math.random() * 5;
+    this.grav = 0.16 + Math.random() * 0.12;
+    this.fric = 0.988;
+    this.rot  = Math.random() * Math.PI * 2;
+    this.rotV = (Math.random() - 0.5) * 0.14;
   }
 
-  update(){
-    if(this.phase==="fall"){
-      this.vy += this.gravity;
-      this.x += this.vx;
-      this.y += this.vy;
-    } else {
-      const dx=this.tx-this.x;
-      const dy=this.ty-this.y;
-      this.x += dx*0.08;
-      this.y += dy*0.08;
-    }
+  update() {
+  if (this.delay > 0) {
+    this.delay--;
+    return;
   }
 
-  draw(){
-    pCtx.globalAlpha=this.alpha;
-    pCtx.fillStyle=this.color;
-    pCtx.fillRect(this.x,this.y,2,2);
+  if (this.phase === "fall") {
+
+    this.vy += this.grav * 1.5;
+    this.vx *= 0.96;
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    const centerX = pCanvas.width / 2;
+    this.x += (centerX - this.x) * 0.002;
+
+  } else {
+
+    const dx = this.tx - this.x;
+    const dy = this.ty - this.y;
+
+    this.x += dx * 0.08;
+    this.y += dy * 0.08;
+
+    this.alpha = 1;
+    this.size *= 0.995;
+
   }
 }
 
-// ─── SPAWN SAND ──────────────────────────────────
-function spawnParticles(){
-  particles=[];
+  draw() {
+    if (this.alpha <= 0.01) return;
+    pCtx.save();
+    pCtx.globalAlpha = this.alpha;
+    pCtx.fillStyle   = this.color;
+    pCtx.translate(this.x, this.y);
+    pCtx.rotate(this.rot);
+    pCtx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+    pCtx.restore();
+  }
+}
 
-  const cx = pCanvas.width/2;
-  const cy = pCanvas.height/2;
+function spawnWheelSand(wCx, wCy) {
+  particles = [];
+  const R   = 205;
+  const N   = 6000;
+  const arcs = getArcs();
 
-  for(let i=0;i<6000;i++){
-    const p = new Particle(
-      cx + (Math.random()-0.5)*200,
-      cy + (Math.random()-0.5)*200,
-      COLORS[i % COLORS.length]
-    );
+  // Weighted colour palette
+  const palette = [];
+  for (let i = 0; i < options.length; i++) {
+    const count = Math.max(1, Math.round(arcs[i] / (Math.PI * 2) * N));
+    for (let k = 0; k < count; k++) palette.push(COLORS[i % COLORS.length]);
+  }
+  palette.sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < N; i++) {
+    const r   = R * Math.sqrt(Math.random());
+    const ang = Math.random() * Math.PI * 2;
+    const px  = wCx + r * Math.cos(ang);
+    const py  = wCy + r * Math.sin(ang);
+
+// чем выше точка — тем раньше падает
+    const normY = (py - (wCy - R)) / (R * 2);
+    const col = palette[i % palette.length];
+    const sz  = 0.4 + Math.random() * 1.2;
+    const p = new Particle(px, py, col, sz);
+    p.delay = normY * 80; // сверху раньше, снизу позже
     particles.push(p);
   }
-
-  animateParticles();
 }
 
-function animateParticles(){
-  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+function setGatherTargets(label, wCy) {
+  const cx = pCanvas.width / 2;
 
-  for(const p of particles){
-    p.update();
-    p.draw();
+// фиксированная зона снизу (не зависит от колеса)
+  const textCy = pCanvas.height - 120;
+
+  const targets = buildTextTargets(label, cx, textCy);
+  if (!targets.length) return;
+  targets.sort(() => Math.random() - 0.5);
+
+  particles.forEach((p, i) => {
+    if (i < targets.length) {
+      p.tx    = targets[i].x;
+      p.ty    = targets[i].y;
+      p.phase = "gather";
+      p.color = "#fff";
+    } else {
+      p.alpha = 0.02; // dismiss extras
+    }
+  });
+
+  // Spawn extras if text needs more dots than we have
+  for (let i = particles.length; i < targets.length; i++) {
+    const ep = new Particle(cx, pCanvas.height - 200, "#fff", 1);
+    ep.phase = "gather";
+    ep.tx    = targets[i].x;
+    ep.ty    = targets[i].y;
+    ep.alpha = 0.2;
+    particles.push(ep);
   }
-
-  particleAnimId = requestAnimationFrame(animateParticles);
 }
 
-// ─── FIREBASE ─────────────────────────────────────
-db.ref("options").on("value",snap=>{
-  if(snap.val()){
-    options = snap.val();
-    drawWheel(currentAngle);
+function runParticles() {
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  particles = particles.filter(p => p.alpha > 0.01);
+  for (const p of particles) { p.update(); p.draw(); }
+  if (particles.length) {
+    particleAnimId = requestAnimationFrame(runParticles);
+  } else {
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    particleAnimId = null;
   }
+}
+
+// ─── Spin logic ───────────────────────────────────────────────────────────────
+function spinTo(idx, onDone) {
+  if (isSpinning) return;
+  isSpinning = true;
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  spinResult.style.opacity = "0";
+  particles = [];
+  if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+  const arcs = getArcs();
+  let ss = 0;
+  for (let i = 0; i < idx; i++) ss += arcs[i];
+  const sm     = ss + arcs[idx] / 2;
+  const target = Math.PI / 2 - sm + Math.PI;
+  const norm   = currentAngle % (Math.PI * 2);
+  let diff     = target - norm;
+  while (diff < 0) diff += Math.PI * 2;
+
+  const finalAngle = currentAngle + diff + (6 + Math.floor(Math.random() * 3)) * Math.PI * 2;
+  const dur        = 4500;
+  const t0         = performance.now();
+  const a0         = currentAngle;
+  lastArrowSector  = -1;
+
+  function frame(now) {
+    const prog = Math.min((now - t0) / dur, 1);
+    const ease = 1 - Math.pow(1 - prog, 4);
+    currentAngle = a0 + (finalAngle - a0) * ease;
+
+    const sec = getSectorUnderArrow(currentAngle);
+    drawWheel(currentAngle, sec);
+
+    if (sec !== lastArrowSector) {
+      if (lastArrowSector !== -1) kickArrow();
+      lastArrowSector = sec;
+    }
+
+    if (prog < 1) { requestAnimationFrame(frame); return; }
+
+    // Finished
+    isSpinning = false;
+    drawWheel(currentAngle, idx);
+
+    const rect = wheelCanvas.getBoundingClientRect();
+    const wCx  = rect.left + rect.width  / 2;
+    const wCy  = rect.top  + rect.height / 2;
+
+    db.ref("history").push({ value: options[idx].label, time: Date.now() });
+
+    // Show winning highlight briefly, then dissolve into sand
+    setTimeout(() => {
+
+      dissolving = true;
+      dissolveProgress = 0;
+
+      spawnWheelSand(wCx, wCy);
+      runParticles();
+
+      const dissolveStart = performance.now();
+
+      function dissolveFrame(now) {
+        const t = (now - dissolveStart) / 2000; // длительность распада
+        dissolveProgress = Math.min(t, 1);
+
+        drawWheel(currentAngle, idx);
+
+        if (t < 1) {
+          requestAnimationFrame(dissolveFrame);
+        } else {
+          dissolving = false;
+        }
+      }
+
+      requestAnimationFrame(dissolveFrame);
+
+      // спустя время частицы начинают собираться в текст
+      setTimeout(() => {
+        setGatherTargets(options[idx].label, wCy);
+      }, 1800);
+
+      hideTimer = setTimeout(() => {
+        spinResult.style.opacity = "0";
+        particles = [];
+        if (particleAnimId) cancelAnimationFrame(particleAnimId);
+        pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+        if (onDone) onDone();
+      }, 9000);
+
+    }, 1400);
+  }
+  requestAnimationFrame(frame);
+}
+
+function processQueue() {
+  if (processingQueue || !spinQueue.length) return;
+  processingQueue = true;
+  const idx = spinQueue.shift();
+  wheelWrap.classList.add("visible");
+  spinTo(idx, () => {
+    processingQueue = false;
+    if (spinQueue.length) setTimeout(processQueue, 600);
+  });
+}
+
+// ─── Firebase listeners ───────────────────────────────────────────────────────
+drawWheel(0);
+
+db.ref("options").on("value", snap => {
+  if (snap.val()) { options = snap.val(); drawWheel(currentAngle); }
+});
+db.ref("goal").on("value", snap => {
+  if (snap.val()) goal = snap.val();
 });
 
-db.ref("goal").on("value",snap=>{
-  goal = snap.val() || 150;
+let lastTs = 0;
+db.ref("spinCommand").on("value", snap => {
+  const data = snap.val();
+  if (!data || data.ts === lastTs) return;
+  lastTs = data.ts;
+  const idx = options.findIndex(o => o.label === data.label);
+  if (idx !== -1) setTimeout(() => { spinQueue.push(idx); processQueue(); }, isSpinning ? 0 : 10000);
 });
 
-// FIX 4
-db.ref("donateTotal").on("value",snap=>{
+db.ref("donateTotal").on("value", snap => {
   const total = snap.val() || 0;
   scaleLabel.innerText = `Колесо ${total}/${goal}`;
   scaleWrap.classList.add("visible");
 });
-
-wheelWrap.classList.add("visible");
-drawWheel(0);
-
 </script>
 </body>
 </html>
