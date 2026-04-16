@@ -189,8 +189,8 @@ function lighten(hex, amt) {
 
 // ─── Draw wheel ───────────────────────────────────────────────────────────────
 function drawWheel(angle, hlIdx = -1) {
-  const dissolveY = H * dissolveProgress;
   const W = wheelCanvas.width, H = wheelCanvas.height;
+  const dissolveY = H * dissolveProgress;
   const cx = W / 2, cy = H / 2, R = cx - 5;
   wCtx.clearRect(0, 0, W, H);
 
@@ -228,12 +228,15 @@ function drawWheel(angle, hlIdx = -1) {
     wCtx.save();
     wCtx.clip();
 
-    // “срезаем” верхнюю часть
-    wCtx.clearRect(0, 0, W, dissolveY);
-
+    // рисуем сектор
     wCtx.fillStyle = g;
     wCtx.fill();
 
+    // “срезаем” верх через прозрачность
+    wCtx.globalCompositeOperation = "destination-out";
+    wCtx.fillRect(0, 0, W, dissolveY);
+
+    wCtx.globalCompositeOperation = "source-over";
     wCtx.restore();
 
     // Sector divider
@@ -371,28 +374,26 @@ class Particle {
 
   if (this.phase === "fall") {
 
-  // вниз сильнее, чем в стороны
-  this.vy += this.grav * 1.5;
-  this.vx *= 0.96;
+    this.vy += this.grav * 1.5;
+    this.vx *= 0.96;
 
-  this.x += this.vx;
-  this.y += this.vy;
+    this.x += this.vx;
+    this.y += this.vy;
 
-  // легкое сужение потока к центру
-  const centerX = pCanvas.width / 2;
-  this.x += (centerX - this.x) * 0.002;
-
-}
+    const centerX = pCanvas.width / 2;
+    this.x += (centerX - this.x) * 0.002;
 
   } else {
+
     const dx = this.tx - this.x;
     const dy = this.ty - this.y;
 
     this.x += dx * 0.08;
     this.y += dy * 0.08;
 
-    this.alpha = 1; // БЕЗ прозрачности
-    this.size  *= 0.995;
+    this.alpha = 1;
+    this.size *= 0.995;
+
   }
 }
 
@@ -411,7 +412,7 @@ class Particle {
 function spawnWheelSand(wCx, wCy) {
   particles = [];
   const R   = 205;
-  const N   = 10000;
+  const N   = 6000;
   const arcs = getArcs();
 
   // Weighted colour palette
@@ -442,7 +443,10 @@ function setGatherTargets(label, wCy) {
   const cx = pCanvas.width / 2;
 
 // фиксированная зона снизу (не зависит от колеса)
-  const textCy = pCanvas.height - 120;
+   const textCy = Math.max(
+      pCanvas.height - 140,
+      wCy + 120
+    );
 
   const targets = buildTextTargets(label, cx, textCy);
   if (!targets.length) return;
@@ -544,7 +548,9 @@ function spinTo(idx, onDone) {
       const dissolveStart = performance.now();
 
       function dissolveFrame(now) {
-        const t = (now - dissolveStart) / 2000; // длительность распада
+        const t = Math.min((now - dissolveStart) / 2200, 1);
+        const ease = t * t; // плавное начало
+        dissolveProgress = ease;
         dissolveProgress = Math.min(t, 1);
 
         drawWheel(currentAngle, idx);
