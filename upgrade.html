@@ -44,7 +44,6 @@
       transform: translateX(-50%);
       z-index: 10;
     }
-    /* text result zone — fixed height below wheel */
     #resultZone {
       width: 100%;
       height: 160px;
@@ -67,13 +66,11 @@
   <canvas id="wheel" width="420" height="420"></canvas>
 </div>
 
-<!-- reserved space so particles know where text zone is -->
 <div id="resultZone"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
-// ─── Firebase ────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
   authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
@@ -83,13 +80,11 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ─── Palette ──────────────────────────────────────────────────────────────────
 const COLORS = [
   "#3d1a6e","#5a2d91","#7b4fa6","#9d6dbf",
   "#4a2278","#6b3d9e","#8c5ab5","#b07fd4"
 ];
 
-// ─── Elements ─────────────────────────────────────────────────────────────────
 const wheelCanvas = document.getElementById("wheel");
 const wCtx        = wheelCanvas.getContext("2d");
 const arrowCanvas = document.getElementById("arrowCanvas");
@@ -105,498 +100,340 @@ function resizeP() { pCanvas.width = window.innerWidth; pCanvas.height = window.
 resizeP();
 window.addEventListener("resize", resizeP);
 
-// ─── State ────────────────────────────────────────────────────────────────────
 let options = [], goal = 150, currentAngle = 0;
 let isSpinning = false, hideTimer = null;
 let spinQueue = [], processingQueue = false;
 let particles = [], particleAnimId = null;
 let lastArrowSector = -1;
-let dissolveProgress = 0;
-let dissolving = false;
 
 // ─── Spring Arrow ─────────────────────────────────────────────────────────────
 const spring = { angle: 0, vel: 0, stiffness: 0.30, damping: 0.52 };
-
 function tickSpring() {
   const f = -spring.stiffness * spring.angle - spring.damping * spring.vel;
-  spring.vel   += f;
-  spring.angle += spring.vel;
+  spring.vel += f; spring.angle += spring.vel;
 }
-
 function renderArrow() {
   const W = arrowCanvas.width, H = arrowCanvas.height;
   aCtx.clearRect(0, 0, W, H);
   aCtx.save();
-  aCtx.translate(W / 2, H - 4);
-  aCtx.rotate(spring.angle);
-  aCtx.translate(-W / 2, -(H - 4));
-
-  const grd = aCtx.createLinearGradient(0, 0, W, 0);
-  grd.addColorStop(0,   "#555");
-  grd.addColorStop(0.28,"#ddd");
-  grd.addColorStop(0.62,"#aaa");
-  grd.addColorStop(1,   "#555");
-
-  aCtx.beginPath();
-  aCtx.moveTo(W / 2, H - 4);
-  aCtx.lineTo(3,  10);
-  aCtx.lineTo(W - 3, 10);
-  aCtx.closePath();
-  aCtx.fillStyle   = grd;
-  aCtx.shadowColor = "rgba(0,0,0,0.65)";
-  aCtx.shadowBlur  = 7;
-  aCtx.fill();
-
-  aCtx.shadowBlur = 0;
-  aCtx.beginPath();
-  aCtx.roundRect(6, 1, W - 12, 12, 3);
-  aCtx.fillStyle   = grd;
-  aCtx.strokeStyle = "#333";
-  aCtx.lineWidth   = 1;
-  aCtx.fill();
-  aCtx.stroke();
+  aCtx.translate(W/2, H-4); aCtx.rotate(spring.angle); aCtx.translate(-W/2, -(H-4));
+  const grd = aCtx.createLinearGradient(0,0,W,0);
+  grd.addColorStop(0,"#555"); grd.addColorStop(0.28,"#ddd");
+  grd.addColorStop(0.62,"#aaa"); grd.addColorStop(1,"#555");
+  aCtx.beginPath(); aCtx.moveTo(W/2,H-4); aCtx.lineTo(3,10); aCtx.lineTo(W-3,10);
+  aCtx.closePath(); aCtx.fillStyle=grd; aCtx.shadowColor="rgba(0,0,0,0.65)";
+  aCtx.shadowBlur=7; aCtx.fill();
+  aCtx.shadowBlur=0; aCtx.beginPath(); aCtx.roundRect(6,1,W-12,12,3);
+  aCtx.fillStyle=grd; aCtx.strokeStyle="#333"; aCtx.lineWidth=1; aCtx.fill(); aCtx.stroke();
   aCtx.restore();
 }
-
-function kickArrow() { spring.vel += (Math.random() > 0.5 ? 1 : -1) * 0.22; }
-
-(function arrowLoop() {
-  tickSpring();
-  renderArrow();
-  requestAnimationFrame(arrowLoop);
-})();
+function kickArrow() { spring.vel += (Math.random()>0.5?1:-1)*0.22; }
+(function arrowLoop() { tickSpring(); renderArrow(); requestAnimationFrame(arrowLoop); })();
 
 // ─── Wheel helpers ────────────────────────────────────────────────────────────
 function getArcs() {
-  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
-  return options.map(o => ((o.weight || 1) / total) * Math.PI * 2);
+  const total = options.reduce((s,o) => s+(o.weight||1), 0);
+  return options.map(o => ((o.weight||1)/total)*Math.PI*2);
 }
-
 function getSectorUnderArrow(angle) {
   if (!options.length) return -1;
   const arcs = getArcs();
-  const norm  = (((- Math.PI / 2) - angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  const norm = (((-Math.PI/2)-angle)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
   let cum = 0;
-  for (let i = 0; i < arcs.length; i++) { cum += arcs[i]; if (norm < cum) return i; }
+  for (let i=0;i<arcs.length;i++) { cum+=arcs[i]; if(norm<cum) return i; }
   return 0;
 }
-
 function lighten(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
+  const n = parseInt(hex.slice(1),16);
   return `rgb(${Math.min(255,(n>>16)+amt)},${Math.min(255,((n>>8)&0xff)+amt)},${Math.min(255,(n&0xff)+amt)})`;
 }
 
 // ─── Draw wheel ───────────────────────────────────────────────────────────────
-// dissolveProgress: 0 = fully visible, 1 = fully gone
-// dissolve happens top→bottom: at progress p, everything above (cy - R + 2*R*p) is dissolved
-function drawWheel(angle, hlIdx = -1) {
+function drawWheel(angle, hlIdx=-1) {
   const W = wheelCanvas.width, H = wheelCanvas.height;
-  const cx = W / 2, cy = H / 2, R = cx - 5;
-  wCtx.clearRect(0, 0, W, H);
-
+  const cx = W/2, cy = H/2, R = cx-5;
+  wCtx.clearRect(0,0,W,H);
   if (!options.length) return;
-
-  // The Y boundary within the canvas below which wheel is still solid
-  // dissolveProgress=0 → dissolveY = top of wheel (nothing dissolved)
-  // dissolveProgress=1 → dissolveY = bottom of wheel (fully dissolved)
-  const dissolveY = (cy - R) + (2 * R * dissolveProgress);
-
-  wCtx.save();
-  wCtx.beginPath();
-  wCtx.arc(cx, cy, R, 0, Math.PI * 2);
-  wCtx.clip();
 
   const arcs = getArcs();
   let sa = angle;
 
-  for (let i = 0; i < options.length; i++) {
-    const ea   = sa + arcs[i];
-    const isHl = i === hlIdx;
-    const base = COLORS[i % COLORS.length];
-
-    wCtx.globalAlpha = (hlIdx !== -1 && !isHl) ? 0.35 : 1;
-
-    const g = wCtx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    if (isHl) {
-      g.addColorStop(0,   lighten(base, 130));
-      g.addColorStop(0.5, lighten(base, 80));
-      g.addColorStop(1,   lighten(base, 40));
-    } else {
-      g.addColorStop(0, lighten(base, 50));
-      g.addColorStop(1, base);
-    }
-
-    wCtx.beginPath();
-    wCtx.moveTo(cx, cy);
-    wCtx.arc(cx, cy, R, sa, ea);
-    wCtx.closePath();
-
-    wCtx.save();
-    wCtx.clip();
-
-    // Draw sector
-    wCtx.fillStyle = g;
-    wCtx.fill();
-
-    // Dissolve: erase everything ABOVE dissolveY (top portion disappears first)
-    if (dissolveProgress > 0) {
-      wCtx.globalCompositeOperation = "destination-out";
-      wCtx.globalAlpha = 1;
-      wCtx.fillRect(0, 0, W, dissolveY);
-      wCtx.globalCompositeOperation = "source-over";
-    }
-
-    wCtx.restore();
-
-    // Divider line
-    wCtx.globalAlpha = isHl ? 0.85 : 0.22;
-    wCtx.strokeStyle = isHl ? "rgba(255,230,255,1)" : "rgba(255,255,255,1)";
-    wCtx.lineWidth   = isHl ? 2.5 : 1.5;
-    wCtx.stroke();
-
-    sa = ea;
+  // Sectors inside clip
+  wCtx.save();
+  wCtx.beginPath(); wCtx.arc(cx,cy,R,0,Math.PI*2); wCtx.clip();
+  for (let i=0;i<options.length;i++) {
+    const ea=sa+arcs[i], isHl=i===hlIdx, base=COLORS[i%COLORS.length];
+    wCtx.globalAlpha=(hlIdx!==-1&&!isHl)?0.35:1;
+    const g=wCtx.createRadialGradient(cx,cy,0,cx,cy,R);
+    if(isHl){g.addColorStop(0,lighten(base,130));g.addColorStop(0.5,lighten(base,80));g.addColorStop(1,lighten(base,40));}
+    else{g.addColorStop(0,lighten(base,50));g.addColorStop(1,base);}
+    wCtx.beginPath(); wCtx.moveTo(cx,cy); wCtx.arc(cx,cy,R,sa,ea); wCtx.closePath();
+    wCtx.fillStyle=g; wCtx.fill();
+    // divider
+    wCtx.globalAlpha=isHl?0.85:0.22;
+    wCtx.strokeStyle=isHl?"rgba(255,230,255,1)":"rgba(255,255,255,1)";
+    wCtx.lineWidth=isHl?2.5:1.5; wCtx.stroke();
+    sa=ea;
   }
   wCtx.restore();
 
-  // Outer ring
+  // Outer ring — drawn OUTSIDE clip so it's always a full ring
   wCtx.save();
-  wCtx.beginPath();
-  wCtx.arc(cx, cy, R, 0, Math.PI * 2);
-  wCtx.strokeStyle = "rgba(170,100,255,0.5)";
-  wCtx.lineWidth   = 4;
-  wCtx.stroke();
+  wCtx.beginPath(); wCtx.arc(cx,cy,R,0,Math.PI*2);
+  wCtx.strokeStyle="rgba(170,100,255,0.8)"; wCtx.lineWidth=5; wCtx.stroke();
   wCtx.restore();
 
-  // Labels — only draw label if its sector midpoint Y is still below dissolveY
-  sa = angle;
-  for (let i = 0; i < options.length; i++) {
-    const arc  = arcs[i];
-    const isHl = i === hlIdx;
-    const midAngle = sa + arc / 2;
-
-    // Approximate label position Y to decide if it's dissolved
-    const labelR  = R - 30;
-    const labelY  = cy + Math.sin(midAngle) * labelR;
-    const labelCanvasY = labelY; // already in canvas coords
-
-    if (dissolveProgress > 0 && labelCanvasY < dissolveY) {
-      sa += arc;
-      continue;
-    }
-
+  // Labels
+  sa=angle;
+  for(let i=0;i<options.length;i++){
+    const arc=arcs[i], isHl=i===hlIdx;
     wCtx.save();
-    wCtx.globalAlpha = (hlIdx !== -1 && !isHl) ? 0.35 : 1;
-    wCtx.translate(cx, cy);
-    wCtx.rotate(midAngle);
-    wCtx.textAlign   = "right";
-    wCtx.fillStyle   = "#fff";
-    wCtx.font        = isHl ? "bold 14px 'Poiret One'" : "13px 'Poiret One'";
-    wCtx.shadowColor = "rgba(0,0,0,0.9)";
-    wCtx.shadowBlur  = 4;
-    wCtx.fillText(options[i].label, R - 14, 6);
-    wCtx.restore();
-    sa += arc;
+    wCtx.globalAlpha=(hlIdx!==-1&&!isHl)?0.35:1;
+    wCtx.translate(cx,cy); wCtx.rotate(sa+arc/2);
+    wCtx.textAlign="right"; wCtx.fillStyle="#fff";
+    wCtx.font=isHl?"bold 14px 'Poiret One'":"13px 'Poiret One'";
+    wCtx.shadowColor="rgba(0,0,0,0.9)"; wCtx.shadowBlur=4;
+    wCtx.fillText(options[i].label,R-14,6);
+    wCtx.restore(); sa+=arc;
   }
 }
 
-// ─── Text targets (particle gather) ──────────────────────────────────────────
+// ─── Snapshot wheel pixels ────────────────────────────────────────────────────
+function snapshotWheelPixels(screenCx, screenCy) {
+  const W=wheelCanvas.width, H=wheelCanvas.height;
+  const imgData=wCtx.getImageData(0,0,W,H);
+  const d=imgData.data;
+  const list=[];
+  for(let py=0;py<H;py+=2){
+    for(let px=0;px<W;px+=2){
+      const idx=(py*W+px)*4;
+      if(d[idx+3]<30) continue;
+      list.push({
+        sx: screenCx-W/2+px,
+        sy: screenCy-H/2+py,
+        r:d[idx], g:d[idx+1], b:d[idx+2],
+        a:d[idx+3]/255,
+        normY: py/H   // 0=top, 1=bottom
+      });
+    }
+  }
+  return list;
+}
+
+// ─── Text targets ─────────────────────────────────────────────────────────────
 function buildTextTargets(label, centerX, centerY) {
-  const W = 900, H = 300;
-  const off = document.createElement("canvas");
-  off.width  = W;
-  off.height = H;
-  const oc = off.getContext("2d");
+  const W=600, H=180;
+  const off=document.createElement("canvas");
+  off.width=W; off.height=H;
+  const oc=off.getContext("2d");
 
-  // Word-wrap
-  const words = label.split(" ");
-  let lines = [], current = "";
-  let fs = 96;
-
-  function fits(text) {
-    oc.font = `bold ${fs}px 'Poiret One'`;
-    return oc.measureText(text).width < W - 60;
+  const words=label.split(" ");
+  let lines=[], current="", fs=40;
+  function fits(t){ oc.font=`bold ${fs}px 'Poiret One'`; return oc.measureText(t).width<W-30; }
+  for(const w of words){
+    const test=current?current+" "+w:w;
+    if(fits(test)) current=test;
+    else{if(current)lines.push(current);current=w;}
   }
+  if(current) lines.push(current);
+  while(lines.some(l=>!fits(l))&&fs>16) fs-=2;
 
-  for (const w of words) {
-    const test = current ? current + " " + w : w;
-    if (fits(test)) { current = test; }
-    else { if (current) lines.push(current); current = w; }
-  }
-  if (current) lines.push(current);
+  oc.font=`bold ${fs}px 'Poiret One'`;
+  oc.fillStyle="#fff"; oc.textAlign="center"; oc.textBaseline="middle";
+  const lh=fs*1.3, startY=H/2-((lines.length-1)*lh)/2;
+  lines.forEach((line,i)=>oc.fillText(line,W/2,startY+i*lh));
 
-  // Shrink font until all lines fit
-  while (lines.some(l => !fits(l)) && fs > 24) { fs -= 4; }
-
-  oc.font         = `bold ${fs}px 'Poiret One'`;
-  oc.fillStyle    = "#ffffff";
-  oc.textAlign    = "center";
-  oc.textBaseline = "middle";
-
-  const lineHeight = fs * 1.25;
-  const startY = H / 2 - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((line, i) => oc.fillText(line, W / 2, startY + i * lineHeight));
-
-  const data = oc.getImageData(0, 0, W, H).data;
-  const pts  = [];
-  for (let y = 0; y < H; y += 2) {
-    for (let x = 0; x < W; x += 2) {
-      if (data[(y * W + x) * 4 + 3] > 100) {
-        pts.push({ x: centerX + (x - W / 2), y: centerY + (y - H / 2) });
+  const data=oc.getImageData(0,0,W,H).data;
+  const pts=[];
+  for(let y=0;y<H;y+=2){
+    for(let x=0;x<W;x+=2){
+      if(data[(y*W+x)*4+3]>80){
+        pts.push({x:centerX+(x-W/2), y:centerY+(y-H/2)});
       }
     }
   }
   return pts;
 }
 
-// ─── Particle class ───────────────────────────────────────────────────────────
+// ─── Particle ─────────────────────────────────────────────────────────────────
 class Particle {
-  constructor(x, y, color, sz) {
-    this.x     = x;
-    this.y     = y;
-    this.origX = x;
-    this.origY = y;
-    this.color = color;
-    this.size  = sz || (0.5 + Math.random() * 1.5);
-    this.alpha = 1;
-    this.phase = "fall";
-    this.tx    = 0;
-    this.ty    = 0;
-
-    // Small random burst from original position (stays near wheel)
-    const ang = Math.random() * Math.PI * 2;
-    const spd = 0.3 + Math.random() * 1.5;
-    this.vx   = Math.cos(ang) * spd;
-    this.vy   = Math.sin(ang) * spd * 0.5 + 0.5;
-    this.grav = 0.04 + Math.random() * 0.04;
-
-    // stagger: particles higher up start falling sooner
-    this.delay = 0;
-    this.rot   = Math.random() * Math.PI * 2;
-    this.rotV  = (Math.random() - 0.5) * 0.08;
+  constructor(sx,sy,r,g,b,alpha,normY){
+    this.x=sx; this.y=sy;
+    this.r=r; this.g=g; this.b=b; this.alpha=alpha;
+    this.size=0.6+Math.random()*1.4;
+    this.phase="fall";
+    this.tx=0; this.ty=0;
+    // top pixels fall sooner (delay=0), bottom pixels wait longer
+    this.delay=Math.floor(normY*100);
+    // tiny random scatter
+    const ang=Math.random()*Math.PI*2;
+    const spd=0.2+Math.random()*0.8;
+    this.vx=Math.cos(ang)*spd*0.5+(Math.random()-0.5)*0.4;
+    this.vy=Math.sin(ang)*spd*0.3+0.2;
+    this.grav=0.05+Math.random()*0.04;
+    this.rot=Math.random()*Math.PI*2;
+    this.rotV=(Math.random()-0.5)*0.08;
   }
-
-  update() {
-    if (this.delay > 0) { this.delay--; return; }
-
-    if (this.phase === "fall") {
-      this.vy  += this.grav;
-      this.vx  *= 0.99;
-      this.x   += this.vx;
-      this.y   += this.vy;
-      this.rot += this.rotV;
-
-      // Fade out if fallen far below screen
-      if (this.y > pCanvas.height + 40) this.alpha = 0;
-
+  update(){
+    if(this.delay>0){this.delay--;return;}
+    if(this.phase==="fall"){
+      this.vy+=this.grav; this.vx*=0.985;
+      this.x+=this.vx; this.y+=this.vy; this.rot+=this.rotV;
+      if(this.y>pCanvas.height+80) this.alpha=0;
     } else {
-      // Gather toward target
-      const dx = this.tx - this.x;
-      const dy = this.ty - this.y;
-      this.x  += dx * 0.09;
-      this.y  += dy * 0.09;
-      this.alpha = Math.min(1, this.alpha + 0.04);
-      this.size *= 0.998;
+      const dx=this.tx-this.x, dy=this.ty-this.y;
+      this.x+=dx*0.10; this.y+=dy*0.10;
+      // gradually whiten
+      this.r=Math.min(255,this.r+10);
+      this.g=Math.min(255,this.g+10);
+      this.b=Math.min(255,this.b+10);
+      this.alpha=Math.min(1,this.alpha+0.06);
     }
   }
-
-  draw() {
-    if (this.alpha <= 0.02) return;
+  draw(){
+    if(this.alpha<=0.02) return;
     pCtx.save();
-    pCtx.globalAlpha = this.alpha;
-    pCtx.fillStyle   = this.color;
-    pCtx.translate(this.x, this.y);
-    pCtx.rotate(this.rot);
-    pCtx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+    pCtx.globalAlpha=this.alpha;
+    pCtx.fillStyle=`rgb(${this.r},${this.g},${this.b})`;
+    pCtx.translate(this.x,this.y); pCtx.rotate(this.rot);
+    pCtx.fillRect(-this.size/2,-this.size/2,this.size,this.size);
     pCtx.restore();
   }
 }
 
-// ─── Spawn particles FROM wheel pixels (real dissolve) ───────────────────────
-function spawnWheelSand(wheelScreenX, wheelScreenY, wheelRadius) {
-  particles = [];
-
-  // Render wheel to offscreen canvas to sample real pixel colours
-  const off = document.createElement("canvas");
-  off.width  = wheelCanvas.width;
-  off.height = wheelCanvas.height;
-  const oc   = off.getContext("2d");
-  oc.drawImage(wheelCanvas, 0, 0);
-  const imgData = oc.getImageData(0, 0, off.width, off.height);
-  const d = imgData.data;
-  const W = off.width, H = off.height;
-
-  const cx = W / 2, cy = H / 2;
-
-  // Sample every 2px → fine sand
-  for (let py = 0; py < H; py += 2) {
-    for (let px = 0; px < W; px += 2) {
-      const idx = (py * W + px) * 4;
-      const a   = d[idx + 3];
-      if (a < 40) continue;
-
-      const r = d[idx], g = d[idx + 1], b = d[idx + 2];
-      const color = `rgb(${r},${g},${b})`;
-
-      // Screen position of this pixel
-      const sx = wheelScreenX - cx + px;
-      const sy = wheelScreenY - cy + py;
-
-      // Distance from wheel centre (canvas coords)
-      const dx = px - cx, dy = py - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      const p    = new Particle(sx, sy, color, 0.8 + Math.random() * 1.2);
-      p.alpha    = a / 255;
-
-      // Stagger: higher pixels (smaller py) fall sooner
-      // Lower pixels wait longer so wheel "melts" top→bottom
-      p.delay = Math.floor((py / H) * 90);
-
-      // Gentle outward drift + gravity — stays roughly in wheel area
-      const angle = Math.atan2(dy, dx);
-      const speed = 0.2 + Math.random() * 0.8;
-      p.vx   = Math.cos(angle) * speed * 0.3 + (Math.random() - 0.5) * 0.6;
-      p.vy   = Math.sin(angle) * speed * 0.3 - 0.1 + Math.random() * 0.4;
-      p.grav = 0.035 + Math.random() * 0.03;
-
-      particles.push(p);
-    }
+// ─── Particle loop ────────────────────────────────────────────────────────────
+function runParticles(){
+  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+  particles=particles.filter(p=>p.alpha>0.02);
+  for(const p of particles){p.update();p.draw();}
+  if(particles.length){
+    particleAnimId=requestAnimationFrame(runParticles);
+  } else {
+    pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+    particleAnimId=null;
   }
 }
 
-// ─── Point particles toward text targets ─────────────────────────────────────
-function setGatherTargets(label, textCenterX, textCenterY) {
-  const targets = buildTextTargets(label, textCenterX, textCenterY);
-  if (!targets.length) return;
+// ─── Dissolve: erase wheel top→bottom, each erased pixel becomes a particle ───
+function startDissolve(screenCx, screenCy) {
+  const pixelList=snapshotWheelPixels(screenCx, screenCy);
+  // Sort by normY for clarity
+  pixelList.sort((a,b)=>a.normY-b.normY);
 
-  // Shuffle so random particles go to random letter positions
-  targets.sort(() => Math.random() - 0.5);
+  // Create all particles immediately — delay handles the stagger
+  particles=[];
+  for(const px of pixelList){
+    particles.push(new Particle(px.sx,px.sy,px.r,px.g,px.b,px.a,px.normY));
+  }
 
-  particles.forEach((p, i) => {
-    if (i < targets.length) {
-      p.tx    = targets[i].x;
-      p.ty    = targets[i].y;
-      p.phase = "gather";
-      p.color = "#ffffff";
-      p.alpha = 0.1;
-    } else {
-      p.alpha = 0; // dismiss surplus
-    }
-  });
+  // Erase wheel canvas rows in sync with particle delay
+  // Each row erased when its particles start moving (~delay frames at 60fps)
+  const W=wheelCanvas.width, H=wheelCanvas.height;
+  const totalFrames=100; // matches max delay
+  let frame=0;
+  function eraseFrame(){
+    const progress=frame/totalFrames;
+    const eraseUpToY=Math.floor(progress*H);
+    wCtx.clearRect(0,0,W,eraseUpToY+4); // +4 px feather
+    frame++;
+    if(frame<=totalFrames) requestAnimationFrame(eraseFrame);
+    else wCtx.clearRect(0,0,W,H);
+  }
+  requestAnimationFrame(eraseFrame);
+  runParticles();
+}
 
-  // Spawn extras if we need more particles than we have
-  for (let i = particles.length; i < targets.length; i++) {
-    const ep    = new Particle(textCenterX, textCenterY - 60, "#ffffff", 1);
-    ep.phase    = "gather";
-    ep.tx       = targets[i].x;
-    ep.ty       = targets[i].y;
-    ep.alpha    = 0.05;
+// ─── Gather particles into text ───────────────────────────────────────────────
+function gatherToText(label, textCX, textCY){
+  const targets=buildTextTargets(label, textCX, textCY);
+  if(!targets.length) return;
+  targets.sort(()=>Math.random()-0.5);
+
+  // Assign falling particles to letter targets
+  let assigned=0;
+  for(const p of particles){
+    if(assigned>=targets.length){p.alpha=0;continue;}
+    p.tx=targets[assigned].x;
+    p.ty=targets[assigned].y;
+    p.phase="gather";
+    p.delay=0; p.vx=0; p.vy=0;
+    assigned++;
+  }
+
+  // Spawn extra particles for any remaining targets
+  for(let i=assigned;i<targets.length;i++){
+    const ep=new Particle(
+      textCX+(Math.random()-0.5)*300,
+      textCY-30+Math.random()*60,
+      255,255,255,0.05,1
+    );
+    ep.phase="gather";
+    ep.tx=targets[i].x; ep.ty=targets[i].y;
+    ep.delay=0; ep.vx=0; ep.vy=0; ep.size=1.2;
     particles.push(ep);
   }
 }
 
-// ─── Particle loop ────────────────────────────────────────────────────────────
-function runParticles() {
-  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-  particles = particles.filter(p => p.alpha > 0.01);
-  for (const p of particles) { p.update(); p.draw(); }
-  if (particles.length) {
-    particleAnimId = requestAnimationFrame(runParticles);
-  } else {
-    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-    particleAnimId = null;
-  }
-}
-
 // ─── Spin logic ───────────────────────────────────────────────────────────────
-function spinTo(idx, onDone) {
-  if (isSpinning) return;
-  isSpinning = true;
-  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-  particles = [];
-  if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
-  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-  dissolveProgress = 0;
+function spinTo(idx, onDone){
+  if(isSpinning) return;
+  isSpinning=true;
+  if(hideTimer){clearTimeout(hideTimer);hideTimer=null;}
+  particles=[];
+  if(particleAnimId){cancelAnimationFrame(particleAnimId);particleAnimId=null;}
+  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
 
-  const arcs = getArcs();
-  let ss = 0;
-  for (let i = 0; i < idx; i++) ss += arcs[i];
-  const sm     = ss + arcs[idx] / 2;
-  const target = Math.PI / 2 - sm + Math.PI;
-  const norm   = currentAngle % (Math.PI * 2);
-  let diff     = target - norm;
-  while (diff < 0) diff += Math.PI * 2;
+  const arcs=getArcs();
+  let ss=0;
+  for(let i=0;i<idx;i++) ss+=arcs[i];
+  const sm=ss+arcs[idx]/2;
+  const target=Math.PI/2-sm+Math.PI;
+  const norm=currentAngle%(Math.PI*2);
+  let diff=target-norm;
+  while(diff<0) diff+=Math.PI*2;
 
-  const finalAngle = currentAngle + diff + (6 + Math.floor(Math.random() * 3)) * Math.PI * 2;
-  const dur        = 4500;
-  const t0         = performance.now();
-  const a0         = currentAngle;
-  lastArrowSector  = -1;
+  const finalAngle=currentAngle+diff+(6+Math.floor(Math.random()*3))*Math.PI*2;
+  const dur=4500, t0=performance.now(), a0=currentAngle;
+  lastArrowSector=-1;
 
-  function frame(now) {
-    const prog = Math.min((now - t0) / dur, 1);
-    const ease = 1 - Math.pow(1 - prog, 4);
-    currentAngle = a0 + (finalAngle - a0) * ease;
+  function frame(now){
+    const prog=Math.min((now-t0)/dur,1);
+    const ease=1-Math.pow(1-prog,4);
+    currentAngle=a0+(finalAngle-a0)*ease;
+    const sec=getSectorUnderArrow(currentAngle);
+    drawWheel(currentAngle,sec);
+    if(sec!==lastArrowSector){if(lastArrowSector!==-1)kickArrow();lastArrowSector=sec;}
+    if(prog<1){requestAnimationFrame(frame);return;}
 
-    const sec = getSectorUnderArrow(currentAngle);
-    drawWheel(currentAngle, sec);
+    // Spin done
+    isSpinning=false;
+    drawWheel(currentAngle,idx);
+    db.ref("history").push({value:options[idx].label,time:Date.now()});
 
-    if (sec !== lastArrowSector) {
-      if (lastArrowSector !== -1) kickArrow();
-      lastArrowSector = sec;
-    }
+    setTimeout(()=>{
+      const rect=wheelCanvas.getBoundingClientRect();
+      const wCx=rect.left+rect.width/2;
+      const wCy=rect.top+rect.height/2;
+      const rzRect=resultZone.getBoundingClientRect();
+      const textCX=pCanvas.width/2;
+      const textCY=rzRect.top+rzRect.height/2;
 
-    if (prog < 1) { requestAnimationFrame(frame); return; }
+      // Dissolve wheel into sand
+      startDissolve(wCx, wCy);
 
-    // ── Spin finished ──
-    isSpinning = false;
-    drawWheel(currentAngle, idx);
+      // After 2s redirect particles into text
+      setTimeout(()=>{
+        gatherToText(options[idx].label, textCX, textCY);
+      }, 2000);
 
-    db.ref("history").push({ value: options[idx].label, time: Date.now() });
-
-    // Wait a moment so player sees the winning sector, then dissolve
-    setTimeout(() => {
-      const rect    = wheelCanvas.getBoundingClientRect();
-      const wCx     = rect.left + rect.width  / 2;
-      const wCy     = rect.top  + rect.height / 2;
-      const wR      = rect.width / 2;
-
-      // Text zone: below wheel, centred horizontally on screen
-      const rzRect  = resultZone.getBoundingClientRect();
-      const textCX  = pCanvas.width  / 2;
-      const textCY  = rzRect.top + rzRect.height / 2;
-
-      // Spawn sand from actual wheel pixels
-      spawnWheelSand(wCx, wCy, wR);
-      runParticles();
-
-      // Dissolve wheel canvas top→bottom over 2.4 s
-      dissolveProgress = 0;
-      const dissolveStart = performance.now();
-      const dissolveDur   = 2400;
-
-      function dissolveFrame(ts) {
-        const t = Math.min((ts - dissolveStart) / dissolveDur, 1);
-        dissolveProgress = t; // linear top→bottom
-        drawWheel(currentAngle, idx);
-        if (t < 1) requestAnimationFrame(dissolveFrame);
-        else { dissolving = false; wCtx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height); }
-      }
-      requestAnimationFrame(dissolveFrame);
-
-      // After particles have been falling ~1.8 s, redirect them into text
-      setTimeout(() => {
-        setGatherTargets(options[idx].label, textCX, textCY);
-      }, 1800);
-
-      // Clean up after 9 s total
-      hideTimer = setTimeout(() => {
-        particles = [];
-        if (particleAnimId) cancelAnimationFrame(particleAnimId);
-        pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-        dissolveProgress = 0;
+      // Clean up after 9s, hide wheel
+      hideTimer=setTimeout(()=>{
+        particles=[];
+        if(particleAnimId) cancelAnimationFrame(particleAnimId);
+        pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+        wheelWrap.classList.remove("visible");
         drawWheel(currentAngle);
-        if (onDone) onDone();
+        if(onDone) onDone();
       }, 9000);
 
     }, 1200);
@@ -605,44 +442,39 @@ function spinTo(idx, onDone) {
 }
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
-function processQueue() {
-  if (processingQueue || !spinQueue.length) return;
-  processingQueue = true;
-  const idx = spinQueue.shift();
+function processQueue(){
+  if(processingQueue||!spinQueue.length) return;
+  processingQueue=true;
+  const idx=spinQueue.shift();
   wheelWrap.classList.add("visible");
-  spinTo(idx, () => {
-    processingQueue = false;
-    if (spinQueue.length) setTimeout(processQueue, 600);
+  spinTo(idx,()=>{
+    processingQueue=false;
+    if(spinQueue.length) setTimeout(processQueue,600);
   });
 }
 
-// ─── Firebase listeners ───────────────────────────────────────────────────────
+// ─── Firebase ─────────────────────────────────────────────────────────────────
 drawWheel(0);
 
-db.ref("options").on("value", snap => {
-  if (snap.val()) {
-    options = snap.val();
-    wheelWrap.classList.add("visible");
-    drawWheel(currentAngle);
-  }
+db.ref("options").on("value", snap=>{
+  if(snap.val()){options=snap.val(); drawWheel(currentAngle);}
+});
+db.ref("goal").on("value", snap=>{
+  if(snap.val()) goal=snap.val();
 });
 
-db.ref("goal").on("value", snap => {
-  if (snap.val()) goal = snap.val();
+let lastTs=0;
+db.ref("spinCommand").on("value", snap=>{
+  const data=snap.val();
+  if(!data||data.ts===lastTs) return;
+  lastTs=data.ts;
+  const idx=options.findIndex(o=>o.label===data.label);
+  if(idx!==-1) setTimeout(()=>{spinQueue.push(idx);processQueue();}, isSpinning?0:10000);
 });
 
-let lastTs = 0;
-db.ref("spinCommand").on("value", snap => {
-  const data = snap.val();
-  if (!data || data.ts === lastTs) return;
-  lastTs = data.ts;
-  const idx = options.findIndex(o => o.label === data.label);
-  if (idx !== -1) setTimeout(() => { spinQueue.push(idx); processQueue(); }, isSpinning ? 0 : 10000);
-});
-
-db.ref("donateTotal").on("value", snap => {
-  const total = snap.val() || 0;
-  scaleLabel.innerText = `Колесо ${total}/${goal}`;
+db.ref("donateTotal").on("value", snap=>{
+  const total=snap.val()||0;
+  scaleLabel.innerText=`Колесо ${total}/${goal}`;
   scaleWrap.classList.add("visible");
 });
 </script>
