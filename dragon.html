@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OBS Roulette</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: transparent;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh; overflow: hidden;
+    }
+
+    .scale-wrap {
+      width: 380px; opacity: 0;
+      transition: opacity 0.4s; margin-bottom: 12px;
+    }
+    .scale-wrap.visible { opacity: 1; }
+    .scale-label {
+      color: #fff; font-size: 32px;
+      font-family: 'Poiret One', cursive;
+      text-align: center;
+      text-shadow: 0 0 12px rgba(140,80,200,0.8);
+      letter-spacing: 2px;
+    }
+
+    /* Outer container — holds dragon ring + arrow, does NOT rotate */
+    .wheel-outer {
+      position: relative;
+      width: 500px; height: 500px;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    .wheel-outer.visible { opacity: 1; }
+
+    /* Dragon SVG — sits on top, full size */
+    .dragon-ring {
+      position: absolute;
+      top: 0; left: 0;
+      width: 500px; height: 500px;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    /* Inner spinning container — wheel canvas + dragon rotate together */
+    .wheel-spin-group {
+      position: absolute;
+      top: 40px; left: 40px;
+      width: 420px; height: 420px;
+      transform-origin: center center;
+    }
+
+    canvas {
+      border-radius: 50%;
+      box-shadow: 0 0 60px rgba(140,80,200,0.7), 0 0 20px rgba(200,80,80,0.3);
+      display: block;
+    }
+
+    /* Arrow — fixed, outside spinning group */
+    .arrow-wrap {
+      position: absolute;
+      top: 28px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.9));
+    }
+    .arrow-wrap svg { width: 36px; height: 52px; }
+
+    #spinResult {
+      margin-top: 16px;
+      min-height: 90px;
+      font-size: 36px;
+      font-family: 'Poiret One', cursive;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(140,80,200,0.9);
+      letter-spacing: 3px;
+      opacity: 0;
+      transition: opacity 0.5s;
+      text-align: center;
+    }
+    #spinResult.visible { opacity: 1; }
+
+    /* Dragon body stroke animation */
+    .dragon-body {
+      stroke-dasharray: 1300;
+      stroke-dashoffset: 1300;
+      transition: none;
+    }
+    .dragon-body.draw {
+      animation: drawDragon 1.8s cubic-bezier(0.4,0,0.2,1) forwards;
+    }
+    @keyframes drawDragon {
+      from { stroke-dashoffset: 1300; }
+      to   { stroke-dashoffset: 0; }
+    }
+
+    .dragon-head {
+      opacity: 0;
+      transform-origin: 250px 30px;
+    }
+    .dragon-head.show {
+      animation: popHead 0.4s 1.6s ease forwards;
+    }
+    @keyframes popHead {
+      0%   { opacity: 0; transform: scale(0.3); }
+      70%  { transform: scale(1.15); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .dragon-tail {
+      opacity: 0;
+    }
+    .dragon-tail.show {
+      animation: fadeTail 0.5s 1.4s ease forwards;
+    }
+    @keyframes fadeTail {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* Idle glow pulse on dragon eyes */
+    .dragon-eye {
+      animation: eyeGlow 2.5s ease-in-out infinite alternate;
+    }
+    @keyframes eyeGlow {
+      from { filter: drop-shadow(0 0 3px #ff4444); }
+      to   { filter: drop-shadow(0 0 10px #ff0000); }
+    }
+
+    /* Dragon scales shimmer */
+    .dragon-scales-shine {
+      animation: scalesShimmer 3s ease-in-out infinite alternate;
+    }
+    @keyframes scalesShimmer {
+      from { opacity: 0.6; }
+      to   { opacity: 1; }
+    }
+
+    /* Spin glow pulse */
+    .spinning-glow {
+      animation: spinGlow 0.3s ease-in-out infinite alternate;
+    }
+    @keyframes spinGlow {
+      from { filter: drop-shadow(0 0 8px rgba(200,80,80,0.5)); }
+      to   { filter: drop-shadow(0 0 20px rgba(200,80,80,0.9)); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="scale-wrap" id="scaleWrap">
+  <div class="scale-label" id="scaleLabel">Колесо 0/150</div>
+</div>
+
+<div class="wheel-outer" id="wheelOuter">
+
+  <!-- Arrow stays fixed -->
+  <div class="arrow-wrap">
+    <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#666"/>
+          <stop offset="30%" style="stop-color:#ddd"/>
+          <stop offset="60%" style="stop-color:#aaa"/>
+          <stop offset="100%" style="stop-color:#555"/>
+        </linearGradient>
+      </defs>
+      <polygon points="18,52 0,4 36,4" fill="url(#metalGrad)"/>
+      <rect x="6" y="0" width="24" height="8" rx="2" fill="url(#metalGrad)" stroke="#333" stroke-width="1"/>
+    </svg>
+  </div>
+
+  <!-- Dragon SVG ring — static, on top of spinning group -->
+  <svg class="dragon-ring" id="dragonRing" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Dragon body gradient: deep red to crimson -->
+      <linearGradient id="dragonBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#8B0000"/>
+        <stop offset="30%" style="stop-color:#CC2200"/>
+        <stop offset="70%" style="stop-color:#AA1800"/>
+        <stop offset="100%" style="stop-color:#660000"/>
+      </linearGradient>
+      <!-- Belly lighter -->
+      <linearGradient id="dragonBellyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#8B2020"/>
+        <stop offset="50%" style="stop-color:#CC5533"/>
+        <stop offset="100%" style="stop-color:#8B2020"/>
+      </linearGradient>
+      <!-- Scales shimmer -->
+      <radialGradient id="scaleShine" cx="50%" cy="30%" r="60%">
+        <stop offset="0%" style="stop-color:#FF6644;stop-opacity:0.4"/>
+        <stop offset="100%" style="stop-color:#660000;stop-opacity:0"/>
+      </radialGradient>
+      <!-- Glow filter -->
+      <filter id="dragonGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="headGlow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!-- Dragon body path: goes clockwise around the wheel ring -->
+    <!-- The body is drawn as a thick stroke path following a circle -->
+    <!-- Center 250,250 — wheel inner radius ~210, dragon center ~220 -->
+
+    <!-- OUTER body (thick, dark) -->
+    <path class="dragon-body" id="dragonBodyOuter"
+      d="
+        M 250 28
+        C 310 22, 380 60, 420 110
+        C 460 160, 475 220, 470 260
+        C 465 320, 440 375, 400 415
+        C 360 455, 310 475, 260 478
+        C 200 481, 150 462, 110 428
+        C 70 394, 42 345, 32 295
+        C 22 245, 30 188, 55 145
+        C 80 102, 122 68, 175 48
+        C 205 38, 230 30, 250 28
+      "
+      fill="none"
+      stroke="url(#dragonBodyGrad)"
+      stroke-width="28"
+      stroke-linecap="round"
+      filter="url(#dragonGlow)"
+    />
+
+    <!-- INNER belly (thinner, lighter) -->
+    <path class="dragon-body dragon-scales-shine" id="dragonBelly"
+      d="
+        M 250 38
+        C 308 33, 372 68, 410 116
+        C 448 164, 463 222, 458 260
+        C 453 316, 430 368, 393 406
+        C 356 444, 308 462, 260 465
+        C 202 468, 154 450, 116 418
+        C 78 386, 52 339, 43 291
+        C 34 243, 41 190, 65 149
+        C 89 108, 129 76, 180 57
+        C 208 47, 232 40, 250 38
+      "
+      fill="none"
+      stroke="url(#dragonBellyGrad)"
+      stroke-width="12"
+      stroke-linecap="round"
+      opacity="0.7"
+    />
+
+    <!-- Scales dots along body -->
+    <g class="dragon-body dragon-scales-shine" id="dragonScales" fill="#AA2200" opacity="0.6">
+      <ellipse cx="310" cy="32"  rx="5" ry="3" transform="rotate(-20 310 32)"/>
+      <ellipse cx="370" cy="65"  rx="5" ry="3" transform="rotate(10 370 65)"/>
+      <ellipse cx="420" cy="115" rx="5" ry="3" transform="rotate(40 420 115)"/>
+      <ellipse cx="455" cy="175" rx="5" ry="3" transform="rotate(70 455 175)"/>
+      <ellipse cx="468" cy="240" rx="5" ry="3" transform="rotate(90 468 240)"/>
+      <ellipse cx="460" cy="305" rx="5" ry="3" transform="rotate(110 460 305)"/>
+      <ellipse cx="435" cy="360" rx="5" ry="3" transform="rotate(135 435 360)"/>
+      <ellipse cx="393" cy="408" rx="5" ry="3" transform="rotate(160 393 408)"/>
+      <ellipse cx="340" cy="448" rx="5" ry="3" transform="rotate(190 340 448)"/>
+      <ellipse cx="278" cy="470" rx="5" ry="3" transform="rotate(200 278 470)"/>
+      <ellipse cx="215" cy="466" rx="5" ry="3" transform="rotate(215 215 466)"/>
+      <ellipse cx="156" cy="444" rx="5" ry="3" transform="rotate(235 156 444)"/>
+      <ellipse cx="107" cy="409" rx="5" ry="3" transform="rotate(255 107 409)"/>
+      <ellipse cx="68"  cy="364" rx="5" ry="3" transform="rotate(280 68 364)"/>
+      <ellipse cx="43"  cy="308" rx="5" ry="3" transform="rotate(300 43 308)"/>
+      <ellipse cx="34"  cy="246" rx="5" ry="3" transform="rotate(270 34 246)"/>
+      <ellipse cx="44"  cy="184" rx="5" ry="3" transform="rotate(250 44 184)"/>
+      <ellipse cx="72"  cy="130" rx="5" ry="3" transform="rotate(225 72 130)"/>
+      <ellipse cx="115" cy="83"  rx="5" ry="3" transform="rotate(200 115 83)"/>
+      <ellipse cx="168" cy="52"  rx="5" ry="3" transform="rotate(170 168 52)"/>
+      <ellipse cx="222" cy="35"  rx="5" ry="3" transform="rotate(150 222 35)"/>
+    </g>
+
+    <!-- TAIL — curling outward from body near top-left -->
+    <g class="dragon-tail" id="dragonTail" filter="url(#dragonGlow)">
+      <!-- Tail spirals off -->
+      <path d="M 175 50 C 150 30, 120 15, 100 25 C 80 35, 75 55, 88 65 C 100 74, 115 65, 112 52 C 109 42, 98 40, 95 48"
+        fill="none" stroke="url(#dragonBodyGrad)" stroke-width="14" stroke-linecap="round"/>
+      <path d="M 175 50 C 150 30, 120 15, 100 25 C 80 35, 75 55, 88 65 C 100 74, 115 65, 112 52 C 109 42, 98 40, 95 48"
+        fill="none" stroke="url(#dragonBellyGrad)" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+      <!-- Tail tip -->
+      <path d="M 95 48 C 90 52, 86 55, 88 58" fill="none" stroke="#CC2200" stroke-width="4" stroke-linecap="round"/>
+    </g>
+
+    <!-- DRAGON HEAD — at top of circle (~250, 28), facing left/down -->
+    <g class="dragon-head" id="dragonHead" filter="url(#headGlow)">
+      <!-- Neck connection -->
+      <path d="M 235 30 C 225 20, 215 18, 210 25 C 205 32, 210 42, 222 44"
+        fill="#8B0000" stroke="#660000" stroke-width="2"/>
+
+      <!-- Main head shape -->
+      <path d="M 210 20 C 195 10, 175 8, 168 16 C 160 24, 162 36, 172 40
+               C 182 44, 192 40, 198 34 C 202 28, 200 20, 210 20 Z"
+        fill="url(#dragonBodyGrad)" stroke="#440000" stroke-width="1.5"/>
+
+      <!-- Snout -->
+      <path d="M 168 24 C 158 22, 148 24, 144 30 C 140 36, 143 44, 152 46
+               C 160 48, 168 44, 170 38 C 172 32, 168 24, 168 24 Z"
+        fill="#AA1800" stroke="#440000" stroke-width="1.5"/>
+
+      <!-- Nostril -->
+      <ellipse cx="152" cy="36" rx="3" ry="2" fill="#330000"/>
+      <ellipse cx="148" cy="38" rx="1.5" ry="1" fill="#FF2200" opacity="0.6"/>
+
+      <!-- Upper jaw / teeth -->
+      <path d="M 144 36 L 138 42 L 143 40 L 140 46 L 145 43 L 142 49 L 148 44 L 152 46"
+        fill="none" stroke="#FFEECC" stroke-width="2" stroke-linejoin="round"/>
+
+      <!-- Lower jaw -->
+      <path d="M 148 42 C 140 48, 138 54, 142 58 C 146 62, 155 60, 160 54"
+        fill="#8B1800" stroke="#440000" stroke-width="1.5"/>
+      <!-- Lower teeth -->
+      <path d="M 142 52 L 139 58 L 143 55 L 141 61 L 146 57"
+        fill="none" stroke="#FFEECC" stroke-width="1.5" stroke-linejoin="round"/>
+
+      <!-- Tongue -->
+      <path d="M 144 50 C 136 52, 130 54, 128 52 M 144 50 C 136 54, 132 58, 130 57"
+        fill="none" stroke="#FF2244" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- Eye socket -->
+      <ellipse cx="176" cy="22" rx="8" ry="6" fill="#220000"/>
+      <!-- Eye glow -->
+      <ellipse class="dragon-eye" cx="176" cy="22" rx="5" ry="4" fill="#FF0000"/>
+      <!-- Pupil -->
+      <ellipse cx="176" cy="22" rx="2" ry="3" fill="#110000"/>
+      <!-- Eye shine -->
+      <ellipse cx="178" cy="20" rx="1.5" ry="1" fill="#FF8866" opacity="0.8"/>
+
+      <!-- Brow ridge / horn -->
+      <path d="M 170 16 C 172 8, 178 4, 182 8 C 186 12, 182 18, 178 18"
+        fill="#990000" stroke="#440000" stroke-width="1"/>
+      <!-- Second small horn -->
+      <path d="M 180 14 C 183 7, 188 5, 190 10 C 192 14, 188 18, 184 17"
+        fill="#880000" stroke="#440000" stroke-width="1"/>
+
+      <!-- Frill / ears -->
+      <path d="M 188 16 C 196 6, 208 4, 212 10 C 214 14, 210 20, 204 20"
+        fill="#7B0000" stroke="#440000" stroke-width="1" opacity="0.8"/>
+      <path d="M 192 14 C 198 6, 208 6, 210 12" fill="none" stroke="#CC3300" stroke-width="1" opacity="0.5"/>
+
+      <!-- Chin spikes -->
+      <path d="M 158 50 C 155 56, 152 60, 150 58 M 162 52 C 160 58, 158 62, 156 60"
+        fill="none" stroke="#AA1800" stroke-width="2" stroke-linecap="round"/>
+    </g>
+
+    <!-- Shine overlay on body -->
+    <path
+      d="
+        M 250 32 C 305 27, 368 63, 406 112
+        C 444 161, 458 218, 453 258
+      "
+      fill="none"
+      stroke="rgba(255,100,60,0.25)"
+      stroke-width="8"
+      stroke-linecap="round"
+      class="dragon-body"
+    />
+  </svg>
+
+  <!-- Spinning group: wheel canvas + nothing else rotates -->
+  <div class="wheel-spin-group" id="wheelSpinGroup">
+    <canvas id="wheel" width="420" height="420"></canvas>
+  </div>
+
+</div>
+
+<div id="spinResult"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+  authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
+  databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+  projectId: "roulette-twitch-2c7a3"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const colors = [
+  "#3d1a6e","#5a2d91","#7b4fa6","#9d6dbf",
+  "#4a2278","#6b3d9e","#8c5ab5","#b07fd4"
+];
+
+let options = [];
+let goal = 150;
+
+const canvas       = document.getElementById("wheel");
+const ctx          = canvas.getContext("2d");
+const wheelOuter   = document.getElementById("wheelOuter");
+const wheelSpin    = document.getElementById("wheelSpinGroup");
+const scaleWrap    = document.getElementById("scaleWrap");
+const scaleLabel   = document.getElementById("scaleLabel");
+const spinResult   = document.getElementById("spinResult");
+
+let currentAngle   = 0;
+let isSpinning     = false;
+let hideTimer      = null;
+let spinQueue      = [];
+let processingQueue = false;
+let dragonAnimated = false;
+
+db.ref("options").on("value", snap => {
+  if (snap.val()) { options = snap.val(); drawWheel(currentAngle); }
+});
+db.ref("goal").on("value", snap => {
+  if (snap.val()) goal = snap.val();
+});
+
+function getArcs() {
+  const total = options.reduce((s,o) => s + (o.weight||1), 0);
+  return options.map(o => ((o.weight||1)/total)*2*Math.PI);
+}
+
+function drawWheel(angle) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const cx = canvas.width/2, cy = canvas.height/2;
+  const radius = cx - 5;
+  const arcs = getArcs();
+  let startA = angle;
+  for (let i = 0; i < options.length; i++) {
+    const endA = startA + arcs[i];
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startA, endA);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
+    const base = colors[i % colors.length];
+    grad.addColorStop(0, lighten(base,50));
+    grad.addColorStop(1, base);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(startA + arcs[i]/2);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fff";
+    ctx.font = "13px 'Poiret One'";
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 5;
+    ctx.fillText(options[i].label, radius-14, 6);
+    ctx.restore();
+    startA = endA;
+  }
+}
+
+function lighten(hex, amount) {
+  const num = parseInt(hex.slice(1),16);
+  const r = Math.min(255,(num>>16)+amount);
+  const g = Math.min(255,((num>>8)&0xff)+amount);
+  const b = Math.min(255,(num&0xff)+amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Dragon intro animation
+function animateDragon(onDone) {
+  if (dragonAnimated) { onDone(); return; }
+  dragonAnimated = true;
+
+  // Trigger body draw
+  document.querySelectorAll('.dragon-body').forEach(el => el.classList.add('draw'));
+  document.getElementById('dragonTail').classList.add('show');
+  document.getElementById('dragonHead').classList.add('show');
+
+  // After 2.2s animation done, callback
+  setTimeout(onDone, 2200);
+}
+
+// Spinning: rotate wheelSpinGroup CSS transform
+let spinGroupAngle = 0; // tracks CSS rotation in radians
+let rafId = null;
+
+function spinTo(index, onDone) {
+  if (isSpinning) return;
+  isSpinning = true;
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+
+  // Add spinning glow
+  wheelSpin.classList.add('spinning-glow');
+
+  const arcs = getArcs();
+  let sectorStart = 0;
+  for (let i = 0; i < index; i++) sectorStart += arcs[i];
+  const sectorMid = sectorStart + arcs[index]/2;
+
+  const target = (Math.PI/2) - sectorMid + Math.PI;
+  const normalizedCurrent = currentAngle % (2*Math.PI);
+  let diff = target - normalizedCurrent;
+  while (diff < 0) diff += 2*Math.PI;
+  while (diff > 2*Math.PI) diff -= 2*Math.PI;
+
+  const extraSpins = (6 + Math.floor(Math.random()*3)) * 2*Math.PI;
+  const finalAngle = currentAngle + diff + extraSpins;
+  const duration = 4500;
+  const start = performance.now();
+  const startAngle = currentAngle;
+
+  function animate(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed/duration, 1);
+    const ease = 1 - Math.pow(1-progress, 4);
+    currentAngle = startAngle + (finalAngle - startAngle)*ease;
+
+    // Rotate wheel canvas AND dragon together via wheelSpin
+    // Dragon is in outer (static), wheel is in inner (rotating)
+    // We rotate only the wheel canvas group
+    wheelSpin.style.transform = `rotate(${currentAngle}rad)`;
+    drawWheel(currentAngle);
+
+    if (progress < 1) {
+      rafId = requestAnimationFrame(animate);
+    } else {
+      isSpinning = false;
+      wheelSpin.classList.remove('spinning-glow');
+      db.ref("history").push({value: options[index].label, time: Date.now()});
+      spinResult.innerText = options[index].label;
+      spinResult.classList.add("visible");
+      hideTimer = setTimeout(() => {
+        wheelOuter.classList.remove("visible");
+        spinResult.classList.remove("visible");
+        dragonAnimated = false;
+        // Reset dragon for next time
+        document.querySelectorAll('.dragon-body').forEach(el => el.classList.remove('draw'));
+        document.getElementById('dragonTail').classList.remove('show');
+        document.getElementById('dragonHead').classList.remove('show');
+        wheelSpin.style.transform = '';
+        currentAngle = 0;
+        drawWheel(0);
+        if (onDone) onDone();
+      }, 6000);
+    }
+  }
+  rafId = requestAnimationFrame(animate);
+}
+
+function processQueue() {
+  if (processingQueue || spinQueue.length === 0) return;
+  processingQueue = true;
+  const index = spinQueue.shift();
+
+  // Show wheel outer
+  wheelOuter.classList.add("visible");
+
+  // Dragon entrance first, then spin
+  animateDragon(() => {
+    spinTo(index, () => {
+      processingQueue = false;
+      if (spinQueue.length > 0) setTimeout(processQueue, 500);
+    });
+  });
+}
+
+drawWheel(0);
+
+let lastTs = 0;
+db.ref("spinCommand").on("value", snap => {
+  const data = snap.val();
+  if (!data || data.ts === lastTs) return;
+  lastTs = data.ts;
+  const index = options.findIndex(o => o.label === data.label);
+  if (index !== -1) {
+    setTimeout(() => {
+      spinQueue.push(index);
+      processQueue();
+    }, isSpinning ? 0 : 10000);
+  }
+});
+
+db.ref("donateTotal").on("value", snap => {
+  const total = snap.val() || 0;
+  scaleLabel.innerText = `Колесо ${total}/${goal}`;
+  scaleWrap.classList.add("visible");
+});
+</script>
+</body>
+</html>
