@@ -6,122 +6,133 @@
   <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       background: transparent;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      overflow: hidden;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh; overflow: hidden;
     }
 
     .scale-wrap {
-      width: 420px;
-      opacity: 0;
-      transition: opacity 0.4s;
-      margin-bottom: 10px;
+      width: 420px; opacity: 0;
+      transition: opacity 0.4s; margin-bottom: 8px;
     }
     .scale-wrap.visible { opacity: 1; }
     .scale-label {
-      color: #fff;
-      font-size: 32px;
+      color: #fff; font-size: 32px;
       font-family: 'Poiret One', cursive;
       text-align: center;
       text-shadow: 0 0 12px rgba(140,80,200,0.8);
       letter-spacing: 2px;
     }
 
+    /* Outer wrapper — никогда не вращается */
     .wheel-outer {
       position: relative;
-      width: 580px;
-      height: 580px;
+      width: 560px; height: 560px;
       opacity: 0;
-      transition: opacity 0.5s ease;
+      transition: opacity 0.4s;
     }
     .wheel-outer.visible { opacity: 1; }
 
-    /* Дракон PNG — mix-blend-mode:screen убирает чёрный фон */
-    .dragon-img {
+    /* SVG дракон — поверх всего, статичен */
+    .dragon-svg {
       position: absolute;
       top: 0; left: 0;
-      width: 100%; height: 100%;
-      object-fit: contain;
-      mix-blend-mode: screen;
+      width: 560px; height: 560px;
       z-index: 6;
       pointer-events: none;
+    }
+
+    /* Все path по умолчанию невидимы */
+    .dragon-svg path,
+    .dragon-svg ellipse,
+    .dragon-svg circle,
+    .dragon-svg polyline,
+    .dragon-svg polygon {
+      fill: none;
+      stroke: #e8e0d0;
+      stroke-linecap: round;
+      stroke-linejoin: round;
       opacity: 0;
-      transform: scale(0.6) rotate(-20deg);
     }
 
-    .dragon-img.phase1 {
-      animation: dragonAppear 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    /* Класс .drawn добавляется JS-ом поочерёдно */
+    .dragon-svg .drawable {
+      stroke-dasharray: var(--len, 2000);
+      stroke-dashoffset: var(--len, 2000);
     }
-    @keyframes dragonAppear {
-      0%   { opacity: 0; transform: scale(0.5) rotate(-30deg);
-             filter: drop-shadow(0 0 0px transparent) brightness(0); }
-      30%  { opacity: 0.5; }
-      70%  { transform: scale(1.05) rotate(4deg); }
-      100% { opacity: 1; transform: scale(1) rotate(0deg);
-             filter: drop-shadow(0 0 12px rgba(200,60,60,0.8))
-                     drop-shadow(0 0 30px rgba(160,40,40,0.5)); }
-    }
-
-    .dragon-img.phase2 {
+    .dragon-svg .drawable.drawn {
+      animation: drawStroke var(--dur, 1s) var(--delay, 0s) ease forwards;
       opacity: 1;
-      transform: scale(1) rotate(0deg);
+    }
+    @keyframes drawStroke {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* Глаза светятся сразу после прорисовки головы */
+    .dragon-svg .eye-glow {
+      fill: #ff3300;
+      stroke: none;
+      opacity: 0;
+      filter: drop-shadow(0 0 4px #ff2200);
+    }
+    .dragon-svg .eye-glow.lit {
+      animation: eyePop 0.3s ease forwards, eyePulse 2s 0.3s ease-in-out infinite alternate;
+    }
+    @keyframes eyePop {
+      0%  { opacity: 0; transform: scale(0); }
+      60% { transform: scale(1.4); }
+      100%{ opacity: 1; transform: scale(1); }
+    }
+    @keyframes eyePulse {
+      from { filter: drop-shadow(0 0 3px #ff2200); }
+      to   { filter: drop-shadow(0 0 10px #ff5500); }
+    }
+
+    /* Дыхание дракона — idle glow на теле */
+    .dragon-svg.breathing {
+      filter: drop-shadow(0 0 6px rgba(220,80,50,0.4));
       animation: dragonBreath 3s ease-in-out infinite alternate;
     }
     @keyframes dragonBreath {
-      from { filter: drop-shadow(0 0 8px rgba(200,60,60,0.6))
-                     drop-shadow(0 0 20px rgba(160,40,40,0.3)); }
-      to   { filter: drop-shadow(0 0 18px rgba(230,80,80,1))
-                     drop-shadow(0 0 45px rgba(180,40,40,0.7)); }
+      from { filter: drop-shadow(0 0 5px rgba(220,80,50,0.3)); }
+      to   { filter: drop-shadow(0 0 18px rgba(230,100,50,0.7)); }
     }
 
-    /* Только колесо вращается */
+    /* Колесо */
     .wheel-spin-group {
       position: absolute;
       top: 50%; left: 50%;
       width: 380px; height: 380px;
-      margin-top: -190px;
-      margin-left: -190px;
+      margin-top: -190px; margin-left: -190px;
       transform-origin: center center;
       z-index: 2;
       opacity: 0;
-      transition: opacity 0.6s ease;
+      transition: opacity 0.7s ease;
     }
     .wheel-spin-group.visible { opacity: 1; }
 
     canvas {
       border-radius: 50%;
-      box-shadow:
-        0 0 50px rgba(140,80,200,0.8),
-        0 0 15px rgba(200,80,80,0.4);
+      box-shadow: 0 0 50px rgba(140,80,200,0.7), 0 0 15px rgba(200,80,80,0.3);
     }
 
-    /* Стрелка — статичная */
+    /* Стрелка */
     .arrow-wrap {
       position: absolute;
       top: 50%; left: 50%;
-      margin-top: -207px;
-      margin-left: -18px;
+      margin-top: -207px; margin-left: -18px;
       z-index: 10;
       filter: drop-shadow(0 4px 8px rgba(0,0,0,0.9));
     }
     .arrow-wrap svg { width: 36px; height: 52px; }
 
     #spinResult {
-      margin-top: 14px;
-      min-height: 80px;
-      font-size: 34px;
-      font-family: 'Poiret One', cursive;
-      color: #fff;
-      text-shadow: 0 0 20px rgba(140,80,200,0.9);
-      letter-spacing: 3px;
-      opacity: 0;
-      transition: opacity 0.5s;
+      margin-top: 14px; min-height: 80px;
+      font-size: 34px; font-family: 'Poiret One', cursive;
+      color: #fff; text-shadow: 0 0 20px rgba(140,80,200,0.9);
+      letter-spacing: 3px; opacity: 0; transition: opacity 0.5s;
       text-align: center;
     }
     #spinResult.visible { opacity: 1; }
@@ -135,16 +146,212 @@
 
 <div class="wheel-outer" id="wheelOuter">
 
-  <!-- Твой дракон PNG. Положи dragon.png рядом с spin.html -->
-  <!-- Если хостишь на GitHub Pages — укажи правильный путь -->
-  <img
-    id="dragonImg"
-    class="dragon-img"
-    src="dragon.png"
-    alt=""
-  />
+  <!--
+    ===== SVG ДРАКОН =====
+    Восточный дракон, обвивающий колесо.
+    Все контуры — stroke-only, как line art / чертёж.
+    Анимация: stroke-dashoffset прорисовка от хвоста к голове.
+    Viewbox 560x560, центр 280,280.
+  -->
+  <svg class="dragon-svg" id="dragonSvg" viewBox="0 0 560 560" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="strongGlow">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
 
-  <!-- Колесо (вращается) -->
+    <!-- ═══════════════════════════════════════
+         ХВОСТ — начинается внизу слева, тонкий
+    ═══════════════════════════════════════ -->
+    <!-- Кончик хвоста -->
+    <path class="drawable" id="p01" stroke-width="1.5" style="--len:120;--dur:0.6s;--delay:0s"
+      d="M 95 480 C 88 470, 82 455, 90 445 C 96 437, 108 438, 112 448"/>
+    <!-- Завиток хвоста -->
+    <path class="drawable" id="p02" stroke-width="2" style="--len:200;--dur:0.7s;--delay:0.5s"
+      d="M 112 448 C 118 460, 126 468, 135 465 C 148 461, 150 445, 140 435 C 130 425, 115 428, 118 442"/>
+    <!-- Основание хвоста — шипы -->
+    <path class="drawable" id="p03" stroke-width="1.2" style="--len:80;--dur:0.4s;--delay:1s"
+      d="M 125 455 C 122 445, 128 436, 135 432"/>
+    <path class="drawable" id="p04" stroke-width="1.2" style="--len:70;--dur:0.4s;--delay:1.1s"
+      d="M 138 450 C 140 438, 148 432, 155 430"/>
+
+    <!-- ═══════════════════════════════════════
+         ТЕЛО — главный контур, обвивает колесо
+         Идёт снизу-слева → низ → право → верх → лево → голова сверху
+    ═══════════════════════════════════════ -->
+    <!-- Нижний сегмент тела (хвост → правый нижний) -->
+    <path class="drawable" id="p10" stroke-width="22" stroke="rgba(80,20,10,0.15)" style="--len:700;--dur:1.8s;--delay:1.3s"
+      d="M 140 440 C 170 480, 240 510, 310 505 C 380 500, 440 470, 475 420 C 510 370, 515 310, 500 258"/>
+    <path class="drawable" id="p11" stroke-width="14" style="--len:700;--dur:1.8s;--delay:1.3s"
+      d="M 140 440 C 170 480, 240 510, 310 505 C 380 500, 440 470, 475 420 C 510 370, 515 310, 500 258"/>
+    <!-- Правый сегмент (нижний → верхний) -->
+    <path class="drawable" id="p12" stroke-width="22" stroke="rgba(80,20,10,0.15)" style="--len:600;--dur:1.5s;--delay:2.8s"
+      d="M 500 258 C 490 200, 460 155, 415 120 C 370 85, 310 68, 258 72"/>
+    <path class="drawable" id="p13" stroke-width="14" style="--len:600;--dur:1.5s;--delay:2.8s"
+      d="M 500 258 C 490 200, 460 155, 415 120 C 370 85, 310 68, 258 72"/>
+    <!-- Верхний сегмент (верх → шея) -->
+    <path class="drawable" id="p14" stroke-width="20" stroke="rgba(80,20,10,0.15)" style="--len:480;--dur:1.2s;--delay:4s"
+      d="M 258 72 C 210 68, 160 80, 120 108 C 95 125, 80 150, 78 178"/>
+    <path class="drawable" id="p15" stroke-width="13" style="--len:480;--dur:1.2s;--delay:4s"
+      d="M 258 72 C 210 68, 160 80, 120 108 C 95 125, 80 150, 78 178"/>
+    <!-- Шея (поворот влево → голова) -->
+    <path class="drawable" id="p16" stroke-width="18" stroke="rgba(80,20,10,0.15)" style="--len:300;--dur:0.8s;--delay:5s"
+      d="M 78 178 C 72 215, 78 248, 95 268 C 108 284, 128 290, 145 282"/>
+    <path class="drawable" id="p17" stroke-width="12" style="--len:300;--dur:0.8s;--delay:5s"
+      d="M 78 178 C 72 215, 78 248, 95 268 C 108 284, 128 290, 145 282"/>
+
+    <!-- ═══════════════════════════════════════
+         ЧЕШУЯ — ромбовидная сетка вдоль тела
+    ═══════════════════════════════════════ -->
+    <!-- Нижняя дуга — чешуя -->
+    <path class="drawable" id="s01" stroke-width="0.8" style="--len:300;--dur:1s;--delay:1.6s"
+      d="M 175 495 C 185 485, 200 482, 210 490 M 220 498 C 230 488, 248 486, 258 494
+         M 275 500 C 288 490, 308 488, 318 496 M 338 492 C 350 482, 368 480, 378 488"/>
+    <path class="drawable" id="s02" stroke-width="0.8" style="--len:280;--dur:1s;--delay:1.8s"
+      d="M 165 480 C 178 472, 195 470, 205 478 M 215 485 C 228 475, 246 473, 256 481
+         M 274 487 C 287 477, 307 475, 317 483 M 336 478 C 350 468, 366 466, 376 474"/>
+    <!-- Правая дуга — чешуя -->
+    <path class="drawable" id="s03" stroke-width="0.8" style="--len:280;--dur:1s;--delay:3s"
+      d="M 498 310 C 492 298, 488 282, 492 270 M 496 240 C 490 228, 482 215, 480 200
+         M 476 185 C 470 172, 464 158, 458 148 M 448 133 C 440 122, 430 112, 418 105"/>
+    <path class="drawable" id="s04" stroke-width="0.8" style="--len:260;--dur:1s;--delay:3.2s"
+      d="M 487 308 C 481 296, 477 280, 481 268 M 485 238 C 479 226, 471 213, 469 198
+         M 465 183 C 459 170, 453 156, 447 146 M 437 131 C 429 120, 419 110, 407 103"/>
+    <!-- Верхняя дуга — чешуя -->
+    <path class="drawable" id="s05" stroke-width="0.8" style="--len:260;--dur:1s;--delay:4.2s"
+      d="M 248 68 C 235 72, 220 78, 205 88 M 192 97 C 178 106, 163 118, 152 130
+         M 140 145 C 130 158, 122 172, 118 186"/>
+    <path class="drawable" id="s06" stroke-width="0.8" style="--len:240;--dur:1s;--delay:4.4s"
+      d="M 250 78 C 237 82, 222 88, 207 98 M 194 107 C 180 116, 165 128, 154 140
+         M 142 155 C 132 168, 124 182, 120 196"/>
+
+    <!-- ═══════════════════════════════════════
+         ХРЕБЕТНЫЕ ШИПЫ вдоль тела
+    ═══════════════════════════════════════ -->
+    <!-- Нижняя дуга — шипы -->
+    <path class="drawable" id="sp01" stroke-width="1.5" style="--len:400;--dur:1s;--delay:2s"
+      d="M 190 510 L 184 525 M 215 512 L 210 528 M 242 512 L 238 528
+         M 270 510 L 267 526 M 298 506 L 296 522 M 325 500 L 324 516
+         M 352 491 L 352 507 M 377 480 L 378 496 M 400 466 L 403 481"/>
+    <!-- Правая дуга — шипы -->
+    <path class="drawable" id="sp02" stroke-width="1.5" style="--len:360;--dur:1s;--delay:3.4s"
+      d="M 515 330 L 530 335 M 516 305 L 531 308 M 514 278 L 529 279
+         M 510 252 L 524 250 M 503 226 L 516 221 M 494 202 L 506 195
+         M 482 180 L 492 171 M 468 159 L 476 149 M 452 141 L 458 130"/>
+    <!-- Верхняя дуга — шипы -->
+    <path class="drawable" id="sp03" stroke-width="1.5" style="--len:320;--dur:0.9s;--delay:4.6s"
+      d="M 240 63 L 238 48 M 215 67 L 210 52 M 192 76 L 185 62
+         M 170 88 L 161 75 M 149 103 L 138 92 M 132 120 L 119 111
+         M 118 140 L 104 133 M 108 162 L 94 157"/>
+
+    <!-- ═══════════════════════════════════════
+         ЛАПЫ — 4 штуки вдоль тела
+    ═══════════════════════════════════════ -->
+    <!-- Лапа 1 — правая нижняя -->
+    <path class="drawable" id="l01" stroke-width="3" style="--len:150;--dur:0.6s;--delay:2.2s"
+      d="M 430 460 C 445 448, 458 442, 465 450 C 470 456, 465 468, 455 470"/>
+    <path class="drawable" id="l01c" stroke-width="1.5" style="--len:120;--dur:0.4s;--delay:2.6s"
+      d="M 455 470 L 448 480 M 460 468 L 455 479 M 465 464 L 462 476 M 470 458 L 469 470"/>
+    <!-- Лапа 2 — правая верхняя -->
+    <path class="drawable" id="l02" stroke-width="3" style="--len:150;--dur:0.6s;--delay:3.6s"
+      d="M 465 170 C 480 158, 495 152, 500 162 C 504 170, 498 182, 488 182"/>
+    <path class="drawable" id="l02c" stroke-width="1.5" style="--len:120;--dur:0.4s;--delay:4s"
+      d="M 488 182 L 482 193 M 494 179 L 490 191 M 500 174 L 498 186 M 506 166 L 505 179"/>
+    <!-- Лапа 3 — левая верхняя -->
+    <path class="drawable" id="l03" stroke-width="3" style="--len:140;--dur:0.5s;--delay:4.8s"
+      d="M 115 128 C 100 116, 88 110, 84 120 C 80 130, 88 142, 98 140"/>
+    <path class="drawable" id="l03c" stroke-width="1.5" style="--len:110;--dur:0.4s;--delay:5.1s"
+      d="M 98 140 L 90 150 M 95 138 L 88 148 M 100 133 L 95 143 M 106 127 L 103 138"/>
+    <!-- Лапа 4 — левая нижняя (у шеи) -->
+    <path class="drawable" id="l04" stroke-width="3" style="--len:140;--dur:0.5s;--delay:5.2s"
+      d="M 118 240 C 100 232, 88 228, 86 238 C 84 248, 95 258, 106 254"/>
+    <path class="drawable" id="l04c" stroke-width="1.5" style="--len:110;--dur:0.4s;--delay:5.5s"
+      d="M 106 254 L 98 265 M 104 252 L 97 262 M 110 247 L 104 257 M 116 242 L 112 252"/>
+
+    <!-- ═══════════════════════════════════════
+         ГОЛОВА — прорисовывается последней
+         Позиция: ~140-210, 250-310
+    ═══════════════════════════════════════ -->
+    <!-- Основа черепа -->
+    <path class="drawable" id="h01" stroke-width="3" filter="url(#glow)" style="--len:400;--dur:0.9s;--delay:5.7s"
+      d="M 145 282 C 140 270, 136 255, 140 242 C 144 228, 155 220, 168 218
+         C 185 216, 200 225, 208 240 C 215 254, 212 272, 202 282 C 192 292, 175 295, 162 290
+         C 152 286, 146 282, 145 282 Z"/>
+    <!-- Морда / рыло -->
+    <path class="drawable" id="h02" stroke-width="2.5" filter="url(#glow)" style="--len:300;--dur:0.7s;--delay:6.4s"
+      d="M 140 260 C 130 255, 118 252, 112 258 C 106 265, 108 278, 118 283
+         C 128 288, 140 282, 145 272"/>
+    <!-- Нижняя челюсть -->
+    <path class="drawable" id="h03" stroke-width="2" filter="url(#glow)" style="--len:250;--dur:0.6s;--delay:6.9s"
+      d="M 112 278 C 108 286, 108 296, 115 302 C 122 308, 135 308, 142 300
+         C 148 293, 148 282, 145 275"/>
+    <!-- Зубы верхние -->
+    <path class="drawable" id="h04" stroke-width="1.5" style="--len:150;--dur:0.4s;--delay:7.3s"
+      d="M 118 270 L 113 278 M 123 267 L 119 275 M 129 265 L 126 274 M 135 265 L 133 274"/>
+    <!-- Зубы нижние -->
+    <path class="drawable" id="h05" stroke-width="1.5" style="--len:130;--dur:0.4s;--delay:7.5s"
+      d="M 116 288 L 112 295 M 122 290 L 119 298 M 128 291 L 126 299 M 134 290 L 133 298"/>
+    <!-- Язык -->
+    <path class="drawable" id="h06" stroke-width="1.8" stroke="#cc2200" style="--len:80;--dur:0.3s;--delay:7.7s"
+      d="M 110 292 C 102 292, 96 288, 94 284 M 110 292 C 102 294, 96 298, 95 302"/>
+    <!-- Ноздря -->
+    <path class="drawable" id="h07" stroke-width="1.5" style="--len:40;--dur:0.2s;--delay:7.9s"
+      d="M 112 262 C 110 258, 114 255, 118 258"/>
+    <!-- Рога / усы мандарина -->
+    <path class="drawable" id="h08" stroke-width="1.8" style="--len:200;--dur:0.5s;--delay:8s"
+      d="M 165 216 C 168 204, 175 196, 178 188 C 181 180, 180 172, 185 168
+         C 188 165, 192 166, 193 172"/>
+    <path class="drawable" id="h09" stroke-width="1.5" style="--len:160;--dur:0.4s;--delay:8.2s"
+      d="M 172 214 C 178 202, 188 196, 194 190 C 200 184, 202 176, 205 174"/>
+    <!-- Рог на голове -->
+    <path class="drawable" id="h10" stroke-width="2" style="--len:100;--dur:0.3s;--delay:8.4s"
+      d="M 180 218 C 183 208, 190 200, 196 196 C 200 193, 204 194, 204 200"/>
+    <!-- Грива / плавники вокруг головы -->
+    <path class="drawable" id="h11" stroke-width="1.5" style="--len:250;--dur:0.6s;--delay:8.5s"
+      d="M 162 218 C 155 206, 148 198, 142 196 M 168 217 C 163 204, 160 194, 162 186
+         M 175 215 C 172 202, 172 190, 176 182 M 185 216 C 184 203, 186 191, 192 184"/>
+    <!-- Борода/усы -->
+    <path class="drawable" id="h12" stroke-width="1.5" style="--len:180;--dur:0.5s;--delay:8.8s"
+      d="M 135 295 C 128 300, 120 308, 116 318 C 112 326, 112 334, 116 338
+         M 138 298 C 134 305, 132 314, 135 322"/>
+    <!-- Гребень на шее -->
+    <path class="drawable" id="h13" stroke-width="1.5" style="--len:200;--dur:0.5s;--delay:9s"
+      d="M 155 286 C 152 295, 148 305, 148 316 C 148 324, 152 330, 158 330
+         M 162 288 C 160 297, 158 308, 160 318"/>
+
+    <!-- ═══════════════════════════════════════
+         ГЛАЗА — появляются отдельно
+    ═══════════════════════════════════════ -->
+    <ellipse class="eye-glow" id="eye1" cx="180" cy="248" rx="7" ry="6"/>
+    <ellipse class="eye-glow" id="eye2" cx="180" cy="248" rx="3" ry="4"
+      style="fill:#110000;opacity:0"/>
+
+    <!-- Контур глаза -->
+    <path class="drawable" id="h_eye" stroke-width="2" filter="url(#strongGlow)" style="--len:80;--dur:0.3s;--delay:9.2s"
+      d="M 174 244 C 176 240, 183 239, 187 243 C 191 247, 190 254, 186 257
+         C 182 260, 175 258, 173 254 C 171 250, 173 244, 174 244"/>
+    <!-- Бровь -->
+    <path class="drawable" id="h_brow" stroke-width="2.5" style="--len:60;--dur:0.25s;--delay:9.4s"
+      d="M 173 240 C 177 234, 185 232, 190 236"/>
+
+    <!-- ═══════════════════════════════════════
+         ТОНКИЕ ДЕТАЛИ — облака, дыхание
+    ═══════════════════════════════════════ -->
+    <path class="drawable" id="c01" stroke-width="1" style="--len:200;--dur:0.5s;--delay:9.5s"
+      d="M 98 258 C 90 252, 82 248, 78 252 C 74 256, 76 264, 84 266
+         C 88 267, 94 264, 94 260"/>
+    <path class="drawable" id="c02" stroke-width="1" style="--len:180;--dur:0.5s;--delay:9.6s"
+      d="M 86 260 C 78 256, 68 254, 64 260 C 60 266, 64 274, 72 274 C 78 274, 84 270, 84 264"/>
+    <path class="drawable" id="c03" stroke-width="0.8" style="--len:150;--dur:0.4s;--delay:9.7s"
+      d="M 72 268 C 65 265, 56 265, 53 270 C 50 275, 54 282, 62 282 C 68 282, 73 278, 72 272"/>
+  </svg>
+
+  <!-- Колесо -->
   <div class="wheel-spin-group" id="wheelSpinGroup">
     <canvas id="wheel" width="380" height="380"></canvas>
   </div>
@@ -154,9 +361,9 @@
     <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%"   style="stop-color:#666"/>
-          <stop offset="30%"  style="stop-color:#ddd"/>
-          <stop offset="60%"  style="stop-color:#aaa"/>
+          <stop offset="0%" style="stop-color:#666"/>
+          <stop offset="30%" style="stop-color:#ddd"/>
+          <stop offset="60%" style="stop-color:#aaa"/>
           <stop offset="100%" style="stop-color:#555"/>
         </linearGradient>
       </defs>
@@ -164,7 +371,6 @@
       <rect x="6" y="0" width="24" height="8" rx="2" fill="url(#metalGrad)" stroke="#333" stroke-width="1"/>
     </svg>
   </div>
-
 </div>
 
 <div id="spinResult"></div>
@@ -172,6 +378,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
+/* ── Firebase ── */
 const firebaseConfig = {
   apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
   authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
@@ -181,35 +388,39 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+/* ── Палитра ── */
 const colors = [
   "#3d1a6e","#5a2d91","#7b4fa6","#9d6dbf",
   "#4a2278","#6b3d9e","#8c5ab5","#b07fd4"
 ];
 
+/* ── Состояние ── */
 let options = [], goal = 150;
 let currentAngle = 0, isSpinning = false;
 let hideTimer = null, spinQueue = [], processingQueue = false;
 let dragonReady = false;
 
-const canvas     = document.getElementById("wheel");
-const ctx        = canvas.getContext("2d");
-const wheelOuter = document.getElementById("wheelOuter");
-const wheelSpin  = document.getElementById("wheelSpinGroup");
-const dragonImg  = document.getElementById("dragonImg");
-const scaleWrap  = document.getElementById("scaleWrap");
-const scaleLabel = document.getElementById("scaleLabel");
-const spinResult = document.getElementById("spinResult");
+/* ── DOM ── */
+const canvas      = document.getElementById("wheel");
+const ctx         = canvas.getContext("2d");
+const wheelOuter  = document.getElementById("wheelOuter");
+const wheelSpin   = document.getElementById("wheelSpinGroup");
+const dragonSvg   = document.getElementById("dragonSvg");
+const scaleWrap   = document.getElementById("scaleWrap");
+const scaleLabel  = document.getElementById("scaleLabel");
+const spinResult  = document.getElementById("spinResult");
 
+/* ── Firebase listeners ── */
 db.ref("options").on("value", snap => {
   if (snap.val()) { options = snap.val(); drawWheel(currentAngle); }
 });
 db.ref("goal").on("value", snap => { if (snap.val()) goal = snap.val(); });
 
+/* ── Рисуем колесо ── */
 function getArcs() {
   const t = options.reduce((s,o) => s+(o.weight||1), 0);
   return options.map(o => ((o.weight||1)/t)*2*Math.PI);
 }
-
 function drawWheel(angle) {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   const cx=canvas.width/2, cy=canvas.height/2, r=cx-5;
@@ -229,11 +440,25 @@ function drawWheel(angle) {
     sa=ea;
   }
 }
-
 function lighten(hex,a){
   const n=parseInt(hex.slice(1),16);
   return `rgb(${Math.min(255,(n>>16)+a)},${Math.min(255,((n>>8)&0xff)+a)},${Math.min(255,(n&0xff)+a)})`;
 }
+
+/* ── Измеряем длины path для dasharray ── */
+function measureAndSetPaths() {
+  const paths = dragonSvg.querySelectorAll('.drawable');
+  paths.forEach(el => {
+    const len = el.getTotalLength ? el.getTotalLength() : 800;
+    el.style.setProperty('--len', Math.ceil(len));
+    el.style.strokeDasharray = Math.ceil(len);
+    el.style.strokeDashoffset = Math.ceil(len);
+  });
+}
+
+/* ── Анимация дракона ── */
+// Полное время анимации ~10 сек (последний элемент delay 9.7s + 0.4s)
+const DRAGON_ANIM_TOTAL = 10200; // мс
 
 function animateDragon(onDone) {
   wheelOuter.classList.add("visible");
@@ -243,26 +468,48 @@ function animateDragon(onDone) {
     onDone(); return;
   }
 
-  // Убираем старые классы, форсируем reflow
-  dragonImg.classList.remove("phase1","phase2");
-  dragonImg.style.opacity = "0";
-  void dragonImg.offsetWidth; // reflow
+  // Форсируем reflow и запускаем анимацию
+  dragonSvg.querySelectorAll('.drawable').forEach(el => {
+    el.classList.remove('drawn');
+    void el.offsetWidth;
+  });
+  document.getElementById('eye1').classList.remove('lit');
+  document.getElementById('eye2').classList.remove('lit');
 
-  dragonImg.classList.add("phase1");
+  measureAndSetPaths();
 
-  setTimeout(() => { wheelSpin.classList.add("visible"); }, 1500);
+  // Запускаем прорисовку через tiny timeout (нужен для reflow)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      dragonSvg.querySelectorAll('.drawable').forEach(el => {
+        el.classList.add('drawn');
+      });
+    });
+  });
 
+  // Глаза загораются около 9.5s
   setTimeout(() => {
-    dragonImg.classList.remove("phase1");
-    dragonImg.classList.add("phase2");
+    document.getElementById('eye1').classList.add('lit');
+    document.getElementById('eye2').style.opacity = '1';
+  }, 9200);
+
+  // Колесо появляется раньше (~6.5s, когда тело уже нарисовано)
+  setTimeout(() => {
+    wheelSpin.classList.add("visible");
+  }, 6500);
+
+  // Переходим в режим дыхания
+  setTimeout(() => {
+    dragonSvg.classList.add('breathing');
     dragonReady = true;
     onDone();
-  }, 2200);
+  }, DRAGON_ANIM_TOTAL);
 }
 
+/* ── Спин ── */
 function spinTo(index, onDone) {
   if(isSpinning) return;
-  isSpinning=true;
+  isSpinning = true;
   if(hideTimer){clearTimeout(hideTimer);hideTimer=null;}
 
   const arcs=getArcs();
@@ -291,21 +538,28 @@ function spinTo(index, onDone) {
     spinResult.classList.add("visible");
 
     hideTimer=setTimeout(()=>{
+      // Прячем
       wheelOuter.classList.remove("visible");
       wheelSpin.classList.remove("visible");
       spinResult.classList.remove("visible");
+      // Сброс дракона
       dragonReady=false;
-      dragonImg.classList.remove("phase1","phase2");
-      dragonImg.style.opacity="0";
-      dragonImg.style.transform="scale(0.6) rotate(-20deg)";
-      wheelSpin.style.transform="";
+      dragonSvg.classList.remove('breathing');
+      dragonSvg.querySelectorAll('.drawable').forEach(el=>{
+        el.classList.remove('drawn');
+        el.style.opacity='0';
+      });
+      document.getElementById('eye1').classList.remove('lit');
+      document.getElementById('eye2').style.opacity='0';
+      wheelSpin.style.transform='';
       currentAngle=0; drawWheel(0);
       if(onDone) onDone();
-    },6000);
+    }, 6000);
   }
   requestAnimationFrame(animate);
 }
 
+/* ── Очередь ── */
 function processQueue(){
   if(processingQueue||spinQueue.length===0) return;
   processingQueue=true;
@@ -320,6 +574,7 @@ function processQueue(){
 
 drawWheel(0);
 
+/* ── Firebase команды ── */
 let lastTs=0;
 db.ref("spinCommand").on("value",snap=>{
   const data=snap.val();
