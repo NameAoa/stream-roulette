@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>OBS Roulette</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cinzel+Decorative:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -11,176 +11,167 @@
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       height: 100vh; overflow: hidden;
-      font-family: 'Cinzel', serif;
+      font-family: 'Poiret One', cursive;
     }
 
-    /* ── Scale label ── */
-    .scale-wrap {
-      width: 380px; opacity: 0;
-      transition: opacity 0.4s; margin-bottom: 12px;
-    }
-    .scale-wrap.visible { opacity: 1; }
-    .scale-label {
-      color: #8b0000;
-      font-size: 28px;
-      font-family: 'Cinzel Decorative', serif;
-      text-align: center;
-      text-shadow: 0 0 16px rgba(139,0,0,0.7);
-      letter-spacing: 3px;
-    }
-
-    /* ── Main stage ── */
     #stage {
       position: relative;
-      width: 460px; height: 460px;
+      width: 480px; height: 480px;
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* ── Intro polygon (SVG) ── */
-    #introSvg {
+    /* Lightning canvas — full stage, behind everything */
+    #lightningCanvas {
       position: absolute;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      opacity: 0;
       pointer-events: none;
-      z-index: 20;
-    }
-    #introSvg polygon {
-      fill: none;
-      stroke: #8b0000;
-      stroke-width: 3;
+      z-index: 1;
+      opacity: 0;
     }
 
-    /* ── Canvas wheel ── */
+    /* Hex / morph SVG */
+    #morphSvg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0;
+    }
+
+    /* Wheel canvas */
     #wheelCanvas {
       position: absolute;
-      border-radius: 50%;
+      left: 30px; top: 30px;
+      width: 420px; height: 420px;
       opacity: 0;
-      z-index: 5;
+      z-index: 3;
     }
 
-    /* ── SVG overlay for sector symbols ── */
-    #symbolsSvg {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-      z-index: 6;
-      opacity: 0;
-    }
-
-    /* ── Arrow ── */
+    /* Arrow */
     .arrow-wrap {
       position: absolute;
-      top: -4px; left: 50%;
+      top: 8px; left: 50%;
       transform: translateX(-50%);
       z-index: 10;
       filter: drop-shadow(0 4px 10px rgba(139,0,0,0.9));
       opacity: 0;
-      transition: opacity 0.4s;
     }
-    .arrow-wrap.visible { opacity: 1; }
-    .arrow-wrap svg { width: 36px; height: 52px; }
+    .arrow-wrap svg { width: 32px; height: 48px; }
 
-    /* ── Result display ── */
-    #resultOverlay {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    /* Winner overlay */
+    #winnerOverlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
       pointer-events: none;
-      z-index: 100;
+      z-index: 20;
       opacity: 0;
     }
-    #resultOverlay.visible { opacity: 1; }
-
-    #winnerSymbol {
-      width: 220px; height: 220px;
+    #winnerSymbolWrap {
+      width: 200px; height: 200px;
       display: flex; align-items: center; justify-content: center;
-      position: relative;
     }
     #winnerSymbolSvg {
       width: 100%; height: 100%;
+      overflow: visible;
+      transform: scale(0);
     }
-    #winnerLabel {
+    #winnerLotName {
       color: #fff;
-      font-family: 'Cinzel Decorative', serif;
-      font-size: 28px;
+      font-family: 'Poiret One', cursive;
+      font-size: 32px;
       text-align: center;
-      text-shadow: 0 0 20px rgba(139,0,0,1), 0 0 40px rgba(139,0,0,0.6);
-      letter-spacing: 3px;
-      margin-top: 20px;
-      max-width: 400px;
+      text-shadow: 0 0 24px rgba(180,0,0,1), 0 0 60px rgba(180,0,0,0.5);
+      letter-spacing: 4px;
+      margin-top: 16px;
       opacity: 0;
+      transform: translateY(10px);
+      max-width: 400px;
+    }
+
+    /* Scale label */
+    #scaleWrap {
+      position: absolute;
+      bottom: -60px; left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      white-space: nowrap;
+    }
+    #scaleWrap.visible { opacity: 1; }
+    #scaleLabel {
+      color: #8b0000;
+      font-size: 22px;
+      font-family: 'Poiret One', cursive;
+      text-align: center;
+      letter-spacing: 3px;
+      text-shadow: 0 0 10px rgba(139,0,0,0.7);
     }
   </style>
 </head>
 <body>
 
-<div class="scale-wrap" id="scaleWrap">
-  <div class="scale-label" id="scaleLabel">Колесо 0/150</div>
-</div>
-
 <div id="stage">
-  <!-- Intro animation polygon -->
-  <svg id="introSvg" viewBox="0 0 460 460" xmlns="http://www.w3.org/2000/svg">
+  <canvas id="lightningCanvas" width="480" height="480"></canvas>
+
+  <svg id="morphSvg" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <filter id="turbFilter" x="-50%" y="-50%" width="200%" height="200%">
-        <feTurbulence id="feTurb" type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="noise"/>
-        <feDisplacementMap id="feDisp" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
-      <radialGradient id="polyGrad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#ff2020" stop-opacity="0.8"/>
-        <stop offset="100%" stop-color="#8b0000" stop-opacity="0.6"/>
+      <radialGradient id="hexGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ff4400" stop-opacity="0.9"/>
+        <stop offset="60%" stop-color="#cc2200" stop-opacity="0.7"/>
+        <stop offset="100%" stop-color="#8b0000" stop-opacity="0.5"/>
       </radialGradient>
+      <filter id="hexGlow">
+        <feGaussianBlur stdDeviation="8" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
     </defs>
-    <!-- Start as a point in the center, morphs to polygon -->
-    <polygon id="introPoly"
-      points="230 230, 230 230, 230 230"
-      fill="url(#polyGrad)"
-      stroke="#8b0000"
+    <polygon id="morphPoly"
+      points="240,240 240,240 240,240 240,240 240,240 240,240"
+      fill="url(#hexGrad)"
+      stroke="#cc2200"
       stroke-width="3"
-      filter="url(#turbFilter)"
+      filter="url(#hexGlow)"
     />
-    <circle id="introGlow" cx="230" cy="230" r="0" fill="none" stroke="#8b0000" stroke-width="2" opacity="0.5"/>
   </svg>
 
   <canvas id="wheelCanvas" width="420" height="420"></canvas>
 
-  <svg id="symbolsSvg" viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg" style="width:420px;height:420px;"></svg>
-
   <div class="arrow-wrap" id="arrowWrap">
-    <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" style="stop-color:#5a0000"/>
-          <stop offset="30%" style="stop-color:#cc0000"/>
-          <stop offset="60%" style="stop-color:#990000"/>
-          <stop offset="100%" style="stop-color:#3a0000"/>
+        <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#5a0000"/>
+          <stop offset="40%" stop-color="#dd1111"/>
+          <stop offset="100%" stop-color="#3a0000"/>
         </linearGradient>
       </defs>
-      <polygon points="18,52 0,4 36,4" fill="url(#metalGrad)"/>
-      <rect x="6" y="0" width="24" height="8" rx="2" fill="url(#metalGrad)" stroke="#3a0000" stroke-width="1"/>
+      <polygon points="16,48 0,4 32,4" fill="url(#arrowGrad)"/>
+      <rect x="5" y="0" width="22" height="8" rx="2" fill="url(#arrowGrad)" stroke="#3a0000" stroke-width="1"/>
     </svg>
   </div>
-</div>
 
-<!-- Winner overlay -->
-<div id="resultOverlay">
-  <div id="winnerSymbol">
-    <svg id="winnerSymbolSvg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="winnerOverlay">
+    <div id="winnerSymbolWrap">
+      <svg id="winnerSymbolSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div id="winnerLotName"></div>
   </div>
-  <div id="winnerLabel"></div>
+
+  <div id="scaleWrap">
+    <div id="scaleLabel">Колесо 0/150</div>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
-// ─────────────────────────────────────────────
-// CONFIG
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
+// FIREBASE
+// ════════════════════════════════════════════
 const firebaseConfig = {
   apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
   authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
@@ -190,73 +181,42 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ─────────────────────────────────────────────
-// CATEGORIES & SYMBOLS
-// 0=circle, 1=diamond, 2=square, 3=triangle, 4=heart
-// ─────────────────────────────────────────────
-const CATEGORIES = ['circle', 'diamond', 'square', 'triangle', 'heart'];
+// ════════════════════════════════════════════
+// CATEGORIES  (cycle through 5)
+// ════════════════════════════════════════════
+const CATS = ['circle','diamond','square','triangle','heart'];
 
-// Draw a symbol into SVG context at center cx,cy with size r
-function symbolPath(type, cx, cy, r) {
+function getCat(i) { return CATS[i % CATS.length]; }
+
+// Draw symbol SVG string centered at (cx,cy) radius r, stroke clr
+function symSVG(type, cx, cy, r, stroke, fill, sw) {
+  sw = sw||3; fill = fill||'none';
   switch(type) {
     case 'circle':
-      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#8b0000" stroke-width="3"/>`;
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
     case 'diamond': {
-      const pts = [
-        `${cx},${cy - r}`,
-        `${cx + r},${cy}`,
-        `${cx},${cy + r}`,
-        `${cx - r},${cy}`
-      ].join(' ');
-      return `<polygon points="${pts}" fill="none" stroke="#8b0000" stroke-width="3"/>`;
+      const p=`${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}`;
+      return `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
     }
     case 'square': {
-      const h = r * 0.82;
-      return `<rect x="${cx-h}" y="${cy-h}" width="${h*2}" height="${h*2}" fill="none" stroke="#8b0000" stroke-width="3"/>`;
+      const h=r*0.8;
+      return `<rect x="${cx-h}" y="${cy-h}" width="${h*2}" height="${h*2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
     }
     case 'triangle': {
-      const pts = [
-        `${cx},${cy - r}`,
-        `${cx + r * 0.866},${cy + r * 0.5}`,
-        `${cx - r * 0.866},${cy + r * 0.5}`
-      ].join(' ');
-      return `<polygon points="${pts}" fill="none" stroke="#8b0000" stroke-width="3"/>`;
+      const p=`${cx},${cy-r} ${cx+r*0.866},${cy+r*0.5} ${cx-r*0.866},${cy+r*0.5}`;
+      return `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
     }
     case 'heart': {
-      // Heart path centered at cx,cy sized ~r
-      const s = r / 50;
-      const tx = cx - 50 * s;
-      const ty = cy - 45 * s;
-      return `<path transform="translate(${tx},${ty}) scale(${s})"
-        d="M50 85 C30 65, 0 50, 0 30 C0 13 13 0 30 0 C39 0 47 4 50 10 C53 4 61 0 70 0 C87 0 100 13 100 30 C100 50 70 65 50 85Z"
-        fill="none" stroke="#8b0000" stroke-width="${3/s}"/>`;
+      const s=r/60; const ox=cx-60*s; const oy=cy-55*s;
+      return `<path transform="translate(${ox},${oy}) scale(${s})" d="M60 100 C35 75,0 60,0 35 C0 15,15 0,35 0 C46 0,55 5,60 13 C65 5,74 0,85 0 C105 0,120 15,120 35 C120 60,85 75,60 100Z" fill="${fill}" stroke="${stroke}" stroke-width="${3/s}"/>`;
     }
   }
   return '';
 }
 
-// Assign category based on option index (cycles through 5)
-function getCategory(index) {
-  return CATEGORIES[index % CATEGORIES.length];
-}
-
-// ─────────────────────────────────────────────
-// WHEEL COLORS — BLACK & DARK RED
-// ─────────────────────────────────────────────
-const WHEEL_COLORS = [
-  '#111111',
-  '#1a0000',
-  '#0d0d0d',
-  '#200000',
-  '#141414',
-  '#180000',
-  '#0a0a0a',
-  '#1e0000',
-];
-
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
 // STATE
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
 let options = [];
 let goal = 150;
 let currentAngle = 0;
@@ -266,33 +226,26 @@ let spinQueue = [];
 let processingQueue = false;
 let lastTs = 0;
 
-const canvas = document.getElementById('wheelCanvas');
-const ctx = canvas.getContext('2d');
-const symbolsSvg = document.getElementById('symbolsSvg');
+const lCanvas = document.getElementById('lightningCanvas');
+const lCtx = lCanvas.getContext('2d');
+const morphSvg = document.getElementById('morphSvg');
+const morphPoly = document.getElementById('morphPoly');
+const wCanvas = document.getElementById('wheelCanvas');
+const wCtx = wCanvas.getContext('2d');
 const arrowWrap = document.getElementById('arrowWrap');
+const winnerOverlay = document.getElementById('winnerOverlay');
+const winnerSymbolSvg = document.getElementById('winnerSymbolSvg');
+const winnerLotName = document.getElementById('winnerLotName');
 const scaleWrap = document.getElementById('scaleWrap');
 const scaleLabel = document.getElementById('scaleLabel');
-const resultOverlay = document.getElementById('resultOverlay');
-const winnerSymbolSvg = document.getElementById('winnerSymbolSvg');
-const winnerLabel = document.getElementById('winnerLabel');
-const introSvg = document.getElementById('introSvg');
-const introPoly = document.getElementById('introPoly');
-const introGlow = document.getElementById('introGlow');
-const feTurb = document.getElementById('feTurb');
-const feDisp = document.getElementById('feDisp');
 
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
 // FIREBASE LISTENERS
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
 db.ref("options").on("value", snap => {
-  if (snap.val()) {
-    options = snap.val();
-    drawWheel(currentAngle);
-  }
+  if (snap.val()) { options = snap.val(); drawWheel(currentAngle, -1); }
 });
-db.ref("goal").on("value", snap => {
-  if (snap.val()) goal = snap.val();
-});
+db.ref("goal").on("value", snap => { if (snap.val()) goal = snap.val(); });
 db.ref("donateTotal").on("value", snap => {
   const total = snap.val() || 0;
   scaleLabel.innerText = `Колесо ${total}/${goal}`;
@@ -304,453 +257,508 @@ db.ref("spinCommand").on("value", snap => {
   lastTs = data.ts;
   const index = options.findIndex(o => o.label === data.label);
   if (index !== -1) {
-    setTimeout(() => {
-      spinQueue.push(index);
-      processQueue();
-    }, isSpinning ? 0 : 10000);
+    setTimeout(() => { spinQueue.push(index); processQueue(); }, isSpinning ? 0 : 10000);
   }
 });
 
-// ─────────────────────────────────────────────
-// ARC HELPERS
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
 function getArcs() {
-  const total = options.reduce((s, o) => s + (o.weight || 1), 0);
-  return options.map(o => ((o.weight || 1) / total) * 2 * Math.PI);
+  const total = options.reduce((s,o)=>s+(o.weight||1),0);
+  return options.map(o=>((o.weight||1)/total)*Math.PI*2);
 }
 
-// ─────────────────────────────────────────────
-// DRAW WHEEL ON CANVAS
-// ─────────────────────────────────────────────
-function drawWheel(angle) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!options.length) return;
+function lerp(a,b,t){return a+(b-a)*t;}
+function easeOut4(t){return 1-Math.pow(1-t,4);}
+function easeInOut3(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
+function easeOutBack(t){const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2);}
 
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const radius = cx - 4;
+function nGon(n, cx, cy, r, rot) {
+  const pts=[];
+  for(let i=0;i<n;i++){
+    const a=(i/n)*Math.PI*2+rot;
+    pts.push(`${cx+Math.cos(a)*r},${cy+Math.sin(a)*r}`);
+  }
+  return pts.join(' ');
+}
+
+// ════════════════════════════════════════════
+// DRAW WHEEL  (highlightIdx = top sector index, -1 = none)
+// ════════════════════════════════════════════
+function getTopSectorIndex(angle) {
+  // Arrow points up (−π/2). Which sector is at the top?
   const arcs = getArcs();
-  let startA = angle;
+  const norm = (((-angle - Math.PI/2) % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+  let acc = 0;
+  for (let i=0; i<arcs.length; i++) {
+    acc += arcs[i];
+    if (norm < acc) return i;
+  }
+  return 0;
+}
 
-  // outer border ring
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius + 3, 0, Math.PI * 2);
-  ctx.strokeStyle = '#8b0000';
-  ctx.lineWidth = 5;
-  ctx.stroke();
+function drawWheel(angle, revealUpTo) {
+  wCtx.clearRect(0,0,420,420);
+  if (!options.length) return;
+  const cx=210, cy=210, R=206;
+  const arcs=getArcs();
+  let start=angle;
+  const topIdx = getTopSectorIndex(angle);
 
-  for (let i = 0; i < options.length; i++) {
-    const endA = startA + arcs[i];
+  // outer border
+  wCtx.beginPath();
+  wCtx.arc(cx,cy,R+4,0,Math.PI*2);
+  wCtx.strokeStyle='#8b0000';
+  wCtx.lineWidth=5;
+  wCtx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radius, startA, endA);
-    ctx.closePath();
-    ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
-    ctx.fill();
-    ctx.strokeStyle = '#8b0000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+  for(let i=0;i<options.length;i++){
+    // if revealUpTo != -1 (sector reveal mode), only draw up to revealUpTo
+    if(revealUpTo !== -1 && i > revealUpTo) { start+=arcs[i]; continue; }
 
-    // label text
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(startA + arcs[i] / 2);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#cc0000';
-    ctx.font = "bold 13px 'Cinzel', serif";
-    ctx.shadowColor = '#000';
-    ctx.shadowBlur = 6;
-    ctx.fillText(options[i].label, radius - 34, 5);
-    ctx.restore();
+    const end = start+arcs[i];
+    const isTop = (i === topIdx) && revealUpTo === -1;
 
-    startA = endA;
+    wCtx.beginPath();
+    wCtx.moveTo(cx,cy);
+    wCtx.arc(cx,cy,R,start,end);
+    wCtx.closePath();
+
+    if(isTop){
+      // Highlight top sector red
+      const g=wCtx.createRadialGradient(cx,cy,0,cx,cy,R);
+      g.addColorStop(0,'#4a0000');
+      g.addColorStop(1,'#1a0000');
+      wCtx.fillStyle=g;
+      // draw black first
+      wCtx.fill();
+      // now red overlay
+      wCtx.beginPath();
+      wCtx.moveTo(cx,cy);
+      wCtx.arc(cx,cy,R,start,end);
+      wCtx.closePath();
+      const rg=wCtx.createRadialGradient(cx,cy,0,cx,cy,R);
+      rg.addColorStop(0,'rgba(180,0,0,0.55)');
+      rg.addColorStop(0.6,'rgba(120,0,0,0.35)');
+      rg.addColorStop(1,'rgba(80,0,0,0.1)');
+      wCtx.fillStyle=rg;
+      wCtx.fill();
+    } else {
+      // alternating near-blacks
+      const shades=['#0d0d0d','#111111','#0a0a0a','#151515'];
+      wCtx.fillStyle=shades[i%shades.length];
+      wCtx.fill();
+    }
+
+    // sector divider
+    wCtx.strokeStyle='#8b0000';
+    wCtx.lineWidth=2;
+    wCtx.stroke();
+
+    // Symbol in sector
+    if(revealUpTo === -1 || i <= revealUpTo){
+      const mid=start+arcs[i]/2;
+      const sr=R*0.68;
+      const sx=cx+Math.cos(mid)*sr;
+      const sy=cy+Math.sin(mid)*sr;
+      const cat=getCat(i);
+      // draw symbol on canvas
+      drawSymbolOnCanvas(wCtx, cat, sx, sy, 13, isTop?'#ff4444':'#8b0000', isTop?2.5:2);
+    }
+
+    start=end;
   }
 
   // center cap
+  wCtx.beginPath();
+  wCtx.arc(cx,cy,16,0,Math.PI*2);
+  wCtx.fillStyle='#080808';
+  wCtx.fill();
+  wCtx.strokeStyle='#8b0000';
+  wCtx.lineWidth=3;
+  wCtx.stroke();
+}
+
+function drawSymbolOnCanvas(ctx, type, cx, cy, r, stroke, sw) {
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = sw;
+  ctx.fillStyle = 'none';
   ctx.beginPath();
-  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fill();
-  ctx.strokeStyle = '#8b0000';
-  ctx.lineWidth = 3;
+  switch(type){
+    case 'circle':
+      ctx.arc(cx,cy,r,0,Math.PI*2);
+      break;
+    case 'diamond':
+      ctx.moveTo(cx,cy-r);
+      ctx.lineTo(cx+r,cy);
+      ctx.lineTo(cx,cy+r);
+      ctx.lineTo(cx-r,cy);
+      ctx.closePath();
+      break;
+    case 'square': {
+      const h=r*0.8;
+      ctx.rect(cx-h,cy-h,h*2,h*2);
+      break;
+    }
+    case 'triangle':
+      ctx.moveTo(cx,cy-r);
+      ctx.lineTo(cx+r*0.866,cy+r*0.5);
+      ctx.lineTo(cx-r*0.866,cy+r*0.5);
+      ctx.closePath();
+      break;
+    case 'heart': {
+      // simple heart
+      const s=r/12;
+      ctx.save();
+      ctx.translate(cx,cy-r*0.1);
+      ctx.scale(s,s);
+      ctx.moveTo(0,0);
+      ctx.bezierCurveTo(-2,-4,-8,-4,-8,0);
+      ctx.bezierCurveTo(-8,4,0,8,0,12);
+      ctx.bezierCurveTo(0,8,8,4,8,0);
+      ctx.bezierCurveTo(8,-4,2,-4,0,0);
+      ctx.restore();
+      break;
+    }
+  }
   ctx.stroke();
 }
 
-// ─────────────────────────────────────────────
-// DRAW SYMBOLS SVG OVERLAY
-// ─────────────────────────────────────────────
-function buildSymbolsSvg(angle) {
-  if (!options.length) return;
-  const cx = 210, cy = 210, radius = 206;
-  const arcs = getArcs();
-  let startA = angle;
-
-  let html = '';
-  for (let i = 0; i < options.length; i++) {
-    const midA = startA + arcs[i] / 2;
-    const sr = radius * 0.72; // symbol radial distance
-    const sx = cx + Math.cos(midA) * sr;
-    const sy = cy + Math.sin(midA) * sr;
-    const cat = getCategory(i);
-    html += `<g class="sector-sym" opacity="0" data-idx="${i}">${symbolPath(cat, sx, sy, 14)}</g>`;
-    startA += arcs[i];
+// ════════════════════════════════════════════
+// LIGHTNING
+// ════════════════════════════════════════════
+function drawLightning(ctx, x1,y1,x2,y2, alpha, branchDepth) {
+  const midX=(x1+x2)/2 + (Math.random()-0.5)*(Math.abs(x2-x1)+Math.abs(y2-y1))*0.4;
+  const midY=(y1+y2)/2 + (Math.random()-0.5)*(Math.abs(x2-x1)+Math.abs(y2-y1))*0.4;
+  ctx.beginPath();
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(midX,midY);
+  ctx.lineTo(x2,y2);
+  ctx.strokeStyle=`rgba(255,180,30,${alpha})`;
+  ctx.lineWidth=branchDepth>0?1.5:0.8;
+  ctx.shadowColor='rgba(255,140,0,0.8)';
+  ctx.shadowBlur=branchDepth>0?12:6;
+  ctx.stroke();
+  ctx.shadowBlur=0;
+  if(branchDepth>0 && Math.random()<0.6){
+    const bx=midX+(Math.random()-0.5)*80;
+    const by=midY+(Math.random()-0.5)*80;
+    drawLightning(ctx,midX,midY,bx,by,alpha*0.6,branchDepth-1);
   }
-  symbolsSvg.innerHTML = html;
 }
 
-// ─────────────────────────────────────────────
-// EASING
-// ─────────────────────────────────────────────
-function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
-function easeInOutCubic(t) { return t < 0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+function runLightning(onDone) {
+  lCanvas.style.opacity='1';
+  const cx=240, cy=240;
+  let frame=0;
+  const totalFrames=40;
+  function tick() {
+    lCtx.clearRect(0,0,480,480);
+    // Central glow
+    const g=lCtx.createRadialGradient(cx,cy,0,cx,cy,80);
+    g.addColorStop(0,`rgba(255,160,20,${0.8*Math.sin(frame/totalFrames*Math.PI)})`);
+    g.addColorStop(1,'rgba(255,100,0,0)');
+    lCtx.fillStyle=g;
+    lCtx.beginPath(); lCtx.arc(cx,cy,80,0,Math.PI*2); lCtx.fill();
 
-function lerp(a, b, t) { return a + (b - a) * t; }
-
-// ─────────────────────────────────────────────
-// TURBULENCE ANIMATION (JS, no anime.js dependency)
-// ─────────────────────────────────────────────
-let turbRaf = null;
-let turbStart = null;
-
-function startTurbulence() {
-  turbStart = performance.now();
-  function tick(now) {
-    const t = ((now - turbStart) / 1200) % 2; // 0..2, ping-pong
-    const p = t < 1 ? t : 2 - t; // 0..1..0
-    feTurb.setAttribute('baseFrequency', lerp(0.01, 0.06, p));
-    feDisp.setAttribute('scale', lerp(0, 20, p));
-    turbRaf = requestAnimationFrame(tick);
-  }
-  turbRaf = requestAnimationFrame(tick);
-}
-function stopTurbulence() {
-  if (turbRaf) cancelAnimationFrame(turbRaf);
-  turbRaf = null;
-  feTurb.setAttribute('baseFrequency', '0.01');
-  feDisp.setAttribute('scale', '0');
-}
-
-// ─────────────────────────────────────────────
-// POLYGON → CIRCLE MORPH
-// ─────────────────────────────────────────────
-function polygonPoints(n, cx, cy, r, rotation) {
-  const pts = [];
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + rotation;
-    pts.push(`${cx + Math.cos(a)*r} ${cy + Math.sin(a)*r}`);
-  }
-  return pts.join(', ');
-}
-
-function circleApproxPoints(n, cx, cy, r) {
-  // approximate circle with n points
-  return polygonPoints(n, cx, cy, r, -Math.PI / 2);
-}
-
-// ─────────────────────────────────────────────
-// MAIN INTRO ANIMATION SEQUENCE
-// ─────────────────────────────────────────────
-function runIntroThenWheel(onDone) {
-  // Phase 1: polygon pops in with turbulence (0 → 700ms)
-  // Phase 2: polygon morphs to circle (700ms → 1400ms)
-  // Phase 3: circle shrinks/fades, wheel canvas + symbols fade in (1400ms → 2400ms)
-  //          sectors appear one by one clockwise, symbol per sector
-
-  introSvg.style.opacity = '1';
-  drawWheel(currentAngle);
-
-  const cx = 230, cy = 230;
-  const nPts = 6; // hexagon → circle
-
-  startTurbulence();
-
-  // Phase 1: burst polygon outward
-  const P1_DUR = 700;
-  const p1Start = performance.now();
-
-  function phase1(now) {
-    const t = Math.min((now - p1Start) / P1_DUR, 1);
-    const ease = easeOutQuart(t);
-    const r = ease * 200;
-    introPoly.setAttribute('points', polygonPoints(nPts, cx, cy, r, -Math.PI/2));
-    introGlow.setAttribute('r', r * 1.1);
-    introGlow.setAttribute('opacity', (1 - ease) * 0.6);
-
-    if (t < 1) { requestAnimationFrame(phase1); }
-    else { setTimeout(phase2, 0); }
-  }
-  requestAnimationFrame(phase1);
-
-  // Phase 2: morph polygon → circle
-  const P2_DUR = 700;
-  let p2Start = null;
-  const polyR = 200;
-
-  function phase2() {
-    p2Start = performance.now();
-    function tick(now) {
-      const t = Math.min((now - p2Start) / P2_DUR, 1);
-      const ease = easeInOutCubic(t);
-      // morph: interpolate each point between polygon and circle positions
-      const polyPts = [];
-      for (let i = 0; i < nPts; i++) {
-        const pa = (i / nPts) * Math.PI * 2 - Math.PI/2;
-        const ca = (i / nPts) * Math.PI * 2 - Math.PI/2; // same
-        const pr = polyR;
-        const cr = polyR;
-        const ang = pa; // same angle
-        // actual morph: poly has pointy vertexes, circle is smooth
-        // We approximate by increasing effective points from 6 to 60
-        const nEff = Math.round(lerp(nPts, 60, ease));
-        if (i === 0) {
-          // rebuild all points
-          const newPts = circleApproxPoints(nEff, cx, cy, polyR);
-          introPoly.setAttribute('points', newPts);
-        }
-      }
-      if (t < 1) { requestAnimationFrame(tick); }
-      else {
-        stopTurbulence();
-        phase3();
-      }
+    // 4–8 lightning bolts from a strike point downward
+    const bolts=5+Math.floor(Math.random()*3);
+    for(let i=0;i<bolts;i++){
+      const angle=(i/bolts)*Math.PI*2;
+      const len=60+Math.random()*120;
+      const ex=cx+Math.cos(angle)*len;
+      const ey=cy+Math.sin(angle)*len;
+      const alpha=0.4+Math.random()*0.5;
+      drawLightning(lCtx,cx,cy,ex,ey,alpha,2);
     }
-    requestAnimationFrame(tick);
+    frame++;
+    if(frame<totalFrames) requestAnimationFrame(tick);
+    else { lCanvas.style.opacity='0'; onDone(); }
   }
-
-  // Phase 3: wheel appears, sectors reveal one by one
-  const P3_DUR = 200;
-  let p3Start = null;
-
-  function phase3() {
-    p3Start = performance.now();
-    buildSymbolsSvg(currentAngle);
-
-    function tick(now) {
-      const t = Math.min((now - p3Start) / P3_DUR, 1);
-      // fade out intro polygon
-      introSvg.style.opacity = 1 - t;
-      // fade in canvas
-      canvas.style.opacity = t;
-
-      if (t < 1) { requestAnimationFrame(tick); }
-      else {
-        introSvg.style.opacity = '0';
-        canvas.style.opacity = '1';
-        symbolsSvg.style.opacity = '1';
-        arrowWrap.classList.add('visible');
-        // reveal sectors one by one
-        revealSectors(onDone);
-      }
-    }
-    requestAnimationFrame(tick);
-  }
+  requestAnimationFrame(tick);
 }
 
-function revealSectors(onDone) {
-  const syms = symbolsSvg.querySelectorAll('.sector-sym');
-  const n = syms.length;
-  if (n === 0) { if (onDone) onDone(); return; }
+// ════════════════════════════════════════════
+// HEX MORPH ANIMATION
+// ════════════════════════════════════════════
+function runHexMorph(onDone) {
+  morphSvg.style.opacity='1';
+  const cx=240, cy=240;
 
-  const perSector = Math.min(120, 600 / n);
-  let i = 0;
+  // Phase A: hex bursts from center outward (0→500ms)
+  // Phase B: hex holds, glows (500→900ms)
+  // Phase C: morph hex → circle (900→1400ms)
+  // Phase D: fade out morph, fade in wheel (1400→1700ms)
 
-  function next() {
-    if (i >= n) { if (onDone) onDone(); return; }
-    // fade in the i-th sector's symbol
-    const el = syms[i];
-    el.style.transition = 'opacity 0.25s';
-    // also do a scale from center animation via transform
-    el.style.transform = 'scale(0)';
-    el.style.transformOrigin = '210px 210px'; // SVG center
-    el.style.opacity = '0';
+  const start=performance.now();
+  const TARGET_R=210; // final hex radius (fills the stage)
 
-    requestAnimationFrame(() => {
-      el.style.transition = 'opacity 0.3s, transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';
-      el.style.transform = 'scale(1)';
-      el.style.opacity = '1';
-    });
+  function tick(now){
+    const elapsed=now-start;
+    const t=elapsed/1700;
+    morphPoly.setAttribute('stroke-width', 3+2*Math.sin(elapsed/100));
 
+    if(elapsed<500){
+      // burst outward
+      const p=easeOutBack(elapsed/500);
+      morphPoly.setAttribute('points', nGon(6,cx,cy,TARGET_R*p,-Math.PI/2));
+      morphPoly.setAttribute('opacity',p);
+    } else if(elapsed<900){
+      morphPoly.setAttribute('points', nGon(6,cx,cy,TARGET_R,-Math.PI/2));
+      morphPoly.setAttribute('opacity',1);
+      // glow pulse
+      const pulse=0.8+0.2*Math.sin(elapsed/60);
+      morphPoly.setAttribute('opacity',pulse);
+    } else if(elapsed<1400){
+      // morph to circle: increase n from 6 to 64
+      const p=(elapsed-900)/500;
+      const e=easeInOut3(p);
+      const n=Math.round(lerp(6,64,e));
+      morphPoly.setAttribute('points', nGon(n,cx,cy,TARGET_R,-Math.PI/2));
+      morphPoly.setAttribute('opacity',1);
+    } else if(elapsed<1700){
+      // fade out morph
+      const p=(elapsed-1400)/300;
+      morphPoly.setAttribute('opacity',1-p);
+      // fade in wheel at same time
+      wCanvas.style.opacity=p;
+    }
+
+    if(elapsed<1700) requestAnimationFrame(tick);
+    else {
+      morphSvg.style.opacity='0';
+      wCanvas.style.opacity='1';
+      onDone();
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+// ════════════════════════════════════════════
+// SECTOR REVEAL (clockwise from 0 to n-1)
+// ════════════════════════════════════════════
+function revealSectors(onDone){
+  if(!options.length){ onDone(); return; }
+  const n=options.length;
+  const perSector=Math.min(150, 800/n);
+  let i=0;
+  function next(){
+    drawWheel(currentAngle, i);
     i++;
-    setTimeout(next, perSector);
+    if(i<n) setTimeout(next, perSector);
+    else setTimeout(()=>{ drawWheel(currentAngle,-1); onDone(); }, 200);
   }
-  next();
+  // start with -1 (empty) then reveal
+  drawWheel(currentAngle,-1); // draw border only
+  // wait a frame then start
+  requestAnimationFrame(()=>{ drawWheel(currentAngle,0); setTimeout(next, perSector); });
 }
 
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
+// FULL INTRO SEQUENCE
+// ════════════════════════════════════════════
+function runIntro(onDone){
+  // reset
+  lCanvas.style.opacity='0';
+  morphSvg.style.opacity='0';
+  wCanvas.style.opacity='0';
+  arrowWrap.style.opacity='0';
+  drawWheel(currentAngle, -2); // draw nothing
+
+  runLightning(()=>{
+    runHexMorph(()=>{
+      // arrow appears
+      arrowWrap.style.transition='opacity 0.3s';
+      arrowWrap.style.opacity='1';
+      revealSectors(()=>{
+        onDone();
+      });
+    });
+  });
+}
+
+// ════════════════════════════════════════════
 // SPIN
-// ─────────────────────────────────────────────
-function spinTo(index, onDone) {
-  if (isSpinning) return;
-  isSpinning = true;
+// ════════════════════════════════════════════
+function spinTo(winIndex, onDone){
+  if(isSpinning) return;
+  isSpinning=true;
 
-  const arcs = getArcs();
-  let sectorStart = 0;
-  for (let i = 0; i < index; i++) sectorStart += arcs[i];
-  const sectorMid = sectorStart + arcs[index] / 2;
+  const arcs=getArcs();
+  let sectorStart=0;
+  for(let i=0;i<winIndex;i++) sectorStart+=arcs[i];
+  const sectorMid=sectorStart+arcs[winIndex]/2;
+  const target=(Math.PI/2)-sectorMid+Math.PI;
+  const norm=currentAngle%(Math.PI*2);
+  let diff=target-norm;
+  while(diff<0) diff+=Math.PI*2;
+  while(diff>Math.PI*2) diff-=Math.PI*2;
+  const extra=(6+Math.floor(Math.random()*3))*Math.PI*2;
+  const finalAngle=currentAngle+diff+extra;
+  const duration=5000;
+  const startTime=performance.now();
+  const startAngle=currentAngle;
 
-  const target = (Math.PI / 2) - sectorMid + Math.PI;
-  const normalizedCurrent = currentAngle % (2 * Math.PI);
-  let diff = target - normalizedCurrent;
-  while (diff < 0) diff += 2 * Math.PI;
-  while (diff > 2 * Math.PI) diff -= 2 * Math.PI;
-
-  const extraSpins = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
-  const finalAngle = currentAngle + diff + extraSpins;
-  const duration = 4500;
-  const start = performance.now();
-  const startAngle = currentAngle;
-
-  // hide symbols during spin
-  symbolsSvg.style.opacity = '0';
-
-  function animateSpin(now) {
-    const elapsed = now - start;
-    const progress = Math.min(elapsed / duration, 1);
-    const ease = easeOutQuart(progress);
-    currentAngle = startAngle + (finalAngle - startAngle) * ease;
-    drawWheel(currentAngle);
-
-    if (progress < 1) {
-      requestAnimationFrame(animateSpin);
-    } else {
-      isSpinning = false;
-      db.ref("history").push({ value: options[index].label, time: Date.now() });
-      // rebuild symbols at new angle
-      buildSymbolsSvg(currentAngle);
-      symbolsSvg.style.opacity = '1';
-
-      // After spin — winner zoom
-      setTimeout(() => {
-        showWinner(index, onDone);
-      }, 800);
+  function frame(now){
+    const e=Math.min((now-startTime)/duration,1);
+    const ease=easeOut4(e);
+    currentAngle=startAngle+(finalAngle-startAngle)*ease;
+    drawWheel(currentAngle,-1);
+    if(e<1){ requestAnimationFrame(frame); }
+    else {
+      isSpinning=false;
+      db.ref("history").push({value:options[winIndex].label,time:Date.now()});
+      setTimeout(()=>{ showWinner(winIndex,onDone); },600);
     }
   }
-  requestAnimationFrame(animateSpin);
+  requestAnimationFrame(frame);
 }
 
-// ─────────────────────────────────────────────
-// WINNER ZOOM
-// ─────────────────────────────────────────────
-function showWinner(index, onDone) {
-  const cat = getCategory(index);
-  const label = options[index].label;
+// ════════════════════════════════════════════
+// WINNER ZOOM  — symbol grows FROM its sector position, wheel shrinks
+// ════════════════════════════════════════════
+function showWinner(winIndex, onDone){
+  const label=options[winIndex].label;
+  const cat=getCat(winIndex);
 
-  // Build winner symbol at center of 220x220 viewBox
-  const cx = 110, cy = 95, r = 70;
-  winnerSymbolSvg.innerHTML = `
+  // Find position of the winning sector on wheel
+  const arcs=getArcs();
+  let sectorStart=0;
+  for(let i=0;i<winIndex;i++) sectorStart+=arcs[i];
+  const mid=currentAngle+sectorStart+arcs[winIndex]/2;
+  const sr=206*0.68;
+  const cx=210, cy=210;
+  const sx=cx+Math.cos(mid)*sr; // sector symbol pos on canvas (0..420)
+  const sy=cy+Math.sin(mid)*sr;
+
+  // Map canvas pos → stage pos (canvas is at left:30,top:30 in stage)
+  const stageX=30+sx;
+  const stageY=30+sy;
+
+  // Winner overlay sits centered in stage (240,240)
+  // We'll animate from (stageX,stageY) → (240,240) while scaling up
+
+  winnerOverlay.style.opacity='1';
+  winnerLotName.style.opacity='0';
+  winnerLotName.style.transform='translateY(10px)';
+  winnerLotName.innerText=label;
+
+  // Build the big symbol
+  const SYM_CX=100, SYM_CY=100, SYM_R=70;
+  winnerSymbolSvg.innerHTML=`
     <defs>
-      <filter id="wGlow">
-        <feGaussianBlur stdDeviation="6" result="blur"/>
-        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      <filter id="wglow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="10" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
     </defs>
-    <g filter="url(#wGlow)" opacity="0" id="winnerG">
-      ${symbolPath(cat, cx, cy, r).replace('stroke="#8b0000"', 'stroke="#cc0000" fill="rgba(139,0,0,0.15)"')}
+    <g filter="url(#wglow)">
+      ${symSVG(cat,SYM_CX,SYM_CY,SYM_R,'#cc2020','rgba(80,0,0,0.2)',4)}
     </g>`;
 
-  const winnerG = winnerSymbolSvg.querySelector('#winnerG');
-  winnerLabel.style.opacity = '0';
-  winnerLabel.innerText = label;
+  const symEl=document.getElementById('winnerSymbolSvg');
 
-  // hide wheel
-  canvas.style.transition = 'opacity 0.5s';
-  canvas.style.opacity = '0';
-  symbolsSvg.style.opacity = '0';
-  arrowWrap.classList.remove('visible');
+  // Animate: wheel shrinks, symbol grows from sector
+  const duration=900;
+  const startTime=performance.now();
 
-  resultOverlay.classList.add('visible');
+  // Initial transform for symbol: start tiny at sector location
+  // Stage center = 240,240. WinnerOverlay is centered, so symbol center = 240,240
+  // Offset from center to sector pos:
+  const offX=stageX-240;
+  const offY=stageY-240;
 
-  // zoom in symbol
-  winnerG.style.transform = 'scale(0.1)';
-  winnerG.style.transformOrigin = `${cx}px ${cy}px`;
-  winnerG.style.transition = 'transform 0.6s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s';
-  winnerG.style.opacity = '0';
+  function frame(now){
+    const t=Math.min((now-startTime)/duration,1);
+    const ease=easeOutBack(Math.min(t,1));
+    const eLinear=easeOut4(t);
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      winnerG.style.transform = 'scale(1)';
-      winnerG.style.opacity = '1';
-    });
-  });
+    // Wheel: shrink + fade
+    wCanvas.style.transform=`scale(${1-eLinear*0.7})`;
+    wCanvas.style.opacity=1-eLinear;
 
-  // pulse the symbol
-  let pulseDir = 1;
-  let pulseScale = 1;
-  let pulseRaf;
-  const pulseStart = performance.now();
-  function pulse(now) {
-    const t = (now - pulseStart) / 800;
-    pulseScale = 1 + 0.05 * Math.sin(t * Math.PI * 2);
-    winnerG.style.transform = `scale(${pulseScale})`;
-    pulseRaf = requestAnimationFrame(pulse);
+    // Symbol: grow from sector pos to center
+    const curX=lerp(offX,0,eLinear);
+    const curY=lerp(offY,0,eLinear);
+    const scale=lerp(0.05,1,ease);
+    symEl.style.transform=`translate(${curX}px,${curY}px) scale(${scale})`;
+    symEl.style.transformOrigin='100px 100px';
+
+    if(t<1) requestAnimationFrame(frame);
+    else {
+      // Show label
+      winnerLotName.style.transition='opacity 0.5s, transform 0.5s';
+      winnerLotName.style.opacity='1';
+      winnerLotName.style.transform='translateY(0)';
+
+      // Pulse the symbol
+      let ph=0;
+      const pulse=setInterval(()=>{
+        ph+=0.15;
+        const sc=1+0.04*Math.sin(ph);
+        symEl.style.transform=`scale(${sc})`;
+        symEl.style.transformOrigin='100px 100px';
+      },30);
+
+      hideTimer=setTimeout(()=>{
+        clearInterval(pulse);
+        winnerOverlay.style.opacity='0';
+        wCanvas.style.transform='scale(1)';
+        wCanvas.style.opacity='0';
+        arrowWrap.style.opacity='0';
+        if(onDone) onDone();
+      },6000);
+    }
   }
-  setTimeout(() => { pulseRaf = requestAnimationFrame(pulse); }, 700);
-
-  // show label
-  setTimeout(() => {
-    winnerLabel.style.transition = 'opacity 0.5s';
-    winnerLabel.style.opacity = '1';
-  }, 900);
-
-  // hide everything after 6s
-  hideTimer = setTimeout(() => {
-    cancelAnimationFrame(pulseRaf);
-    resultOverlay.classList.remove('visible');
-    canvas.style.opacity = '0';
-    arrowWrap.classList.remove('visible');
-    winnerLabel.style.opacity = '0';
-    if (onDone) onDone();
-  }, 6000);
+  requestAnimationFrame(frame);
 }
 
-// ─────────────────────────────────────────────
+// ════════════════════════════════════════════
 // QUEUE
-// ─────────────────────────────────────────────
-function processQueue() {
-  if (processingQueue || spinQueue.length === 0) return;
-  processingQueue = true;
-  const index = spinQueue.shift();
+// ════════════════════════════════════════════
+function processQueue(){
+  if(processingQueue||spinQueue.length===0) return;
+  processingQueue=true;
+  const index=spinQueue.shift();
 
-  // reset canvas visibility for new spin
-  canvas.style.transition = 'opacity 0.4s';
-  canvas.style.opacity = '0';
-  symbolsSvg.style.opacity = '0';
-  arrowWrap.classList.remove('visible');
+  // reset all
+  wCanvas.style.transition='';
+  wCanvas.style.transform='scale(1)';
+  wCanvas.style.opacity='0';
+  winnerOverlay.style.opacity='0';
+  winnerLotName.style.opacity='0';
+  arrowWrap.style.opacity='0';
+  if(hideTimer){clearTimeout(hideTimer);hideTimer=null;}
 
-  // run intro animation then spin
-  runIntroThenWheel(() => {
-    spinTo(index, () => {
-      processingQueue = false;
-      if (spinQueue.length > 0) setTimeout(processQueue, 1500);
+  runIntro(()=>{
+    spinTo(index,()=>{
+      processingQueue=false;
+      if(spinQueue.length>0) setTimeout(processQueue,1500);
     });
   });
 }
 
-// ─────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────
-drawWheel(0);
+// Init
+drawWheel(0,-2);
 
-// ─────────────────────────── DEV TEST ───────────────────────────
-// Uncomment to test locally without Firebase:
-//
-// setTimeout(() => {
-//   options = [
-//     { label: 'Лот 1', weight: 1 },
-//     { label: 'Лот 2', weight: 1 },
-//     { label: 'Лот 3', weight: 1 },
-//     { label: 'Лот 4', weight: 1 },
-//     { label: 'Лот 5', weight: 1 },
-//     { label: 'Лот 6', weight: 1 },
-//     { label: 'Лот 7', weight: 1 },
-//     { label: 'Лот 8', weight: 1 },
-//   ];
-//   drawWheel(0);
-//   spinQueue.push(3);
-//   processQueue();
-// }, 500);
-
+/* ── DEV TEST (uncomment to test without Firebase) ──
+setTimeout(()=>{
+  options=[
+    {label:'Арт стрим',weight:1},
+    {label:'Just Chatting',weight:1},
+    {label:'Инди хоррор',weight:1},
+    {label:'Minecraft',weight:1},
+    {label:'Valorant',weight:1},
+    {label:'Чтение донатов',weight:1},
+    {label:'Speedrun',weight:1},
+    {label:'Meme review',weight:1},
+  ];
+  drawWheel(0,-1);
+  spinQueue.push(3);
+  processQueue();
+},300);
+*/
 </script>
 </body>
 </html>
