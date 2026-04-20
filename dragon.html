@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>Slot Roulette</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Poiret+One&display=swap');
 * { margin:0; padding:0; box-sizing:border-box; }
 
 body {
@@ -16,15 +16,22 @@ body {
   position: relative;
 }
 
-/* ===== ROOT CONTAINER: top-right area ===== */
+/* ===== ROOT CONTAINER ===== */
 #root {
   position: absolute;
   top: 60px;
   right: 30px;
-  display: flex;
-  align-items: flex-end;
-  gap: 0px;
   opacity: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Row: lycoris + widget side by side */
+#roulette-row {
+  display: flex;
+  align-items: center; /* vertically center widget to stem mid */
+  gap: 0;
 }
 
 /* ===== LYCORIS LEFT ===== */
@@ -33,7 +40,6 @@ body {
   height: 200px;
   flex-shrink: 0;
   position: relative;
-  bottom: 0;
 }
 #lycoris-svg { width: 100%; height: 100%; }
 
@@ -44,6 +50,30 @@ body {
   opacity: 0;
 }
 
+/* ===== WINNER TEXT (outside widget, below) ===== */
+#winner-outside {
+  margin-top: 14px;
+  /* indent to align under widget, not under lycoris */
+  margin-left: 90px;
+  width: 480px;
+  text-align: center;
+  min-height: 32px;
+}
+#winner-outside-text {
+  font-family: 'Poiret One', cursive;
+  color: #ff3300;
+  font-size: 22px;
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 16px #ff0000, 0 0 36px #ff000066;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity .5s, transform .5s;
+}
+#winner-outside-text.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .widget-outer {
   background: #0d0d0d;
   border: 2px solid #cc0000;
@@ -52,6 +82,7 @@ body {
   padding: 10px;
   position: relative;
   width: 480px;
+  /* no extra bottom space — slot viewport fills it */
 }
 .widget-outer::before {
   content:''; position:absolute; top:-2px; left:-2px;
@@ -136,24 +167,9 @@ body {
   line-height:1.35;
 }
 .lot-card.winner {
-  border-color:#ff2200;
-  background:#160000;
-  box-shadow:0 0 20px #ff220044, inset 0 0 14px #2a0000;
+  border-color: #ff2200;
+  background: #160000;
 }
-
-/* ===== WINNER TEXT ===== */
-#winner-row {
-  height:20px; margin-top:7px;
-  display:flex; align-items:center; justify-content:center;
-  overflow:hidden;
-}
-#winner-text {
-  color:#ff3300; font-size:10px; letter-spacing:.2em;
-  text-shadow:0 0 12px #ff0000, 0 0 28px #ff000055;
-  opacity:0; transform:translateY(14px);
-  transition:opacity .5s, transform .5s;
-}
-#winner-text.show { opacity:1; transform:translateY(0); }
 
 /* ===== PETALS ===== */
 .fall-petal {
@@ -174,50 +190,56 @@ body {
 <body>
 
 <div id="root">
-  <!-- LYCORIS (left) -->
-  <div id="lycoris-wrap">
-    <svg id="lycoris-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
-      <path id="stem" d="M100 400 Q95 300 100 200"
-            stroke="#660000" stroke-width="4" fill="none"
-            stroke-dasharray="230" stroke-dashoffset="230"/>
-      <path id="leaf1" d="M98 310 Q70 290 58 268"
-            stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
-      <path id="leaf2" d="M102 275 Q132 255 144 232"
-            stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
-      <g id="fhead" transform="translate(100,195)" opacity="0">
-        <g id="stamens" opacity="0">
-          <line x1="0" y1="0" x2="-32" y2="-46" stroke="#cc0000" stroke-width="1.3"/>
-          <line x1="0" y1="0" x2="-16" y2="-52" stroke="#cc0000" stroke-width="1.3"/>
-          <line x1="0" y1="0" x2="5"   y2="-54" stroke="#cc0000" stroke-width="1.3"/>
-          <line x1="0" y1="0" x2="23"  y2="-49" stroke="#cc0000" stroke-width="1.3"/>
-          <line x1="0" y1="0" x2="36"  y2="-39" stroke="#cc0000" stroke-width="1.3"/>
-          <line x1="0" y1="0" x2="42"  y2="-23" stroke="#cc0000" stroke-width="1.3"/>
-          <circle cx="-32" cy="-46" r="2.8" fill="#ff2200"/>
-          <circle cx="-16" cy="-52" r="2.8" fill="#ff2200"/>
-          <circle cx="5"   cy="-54" r="2.8" fill="#ff2200"/>
-          <circle cx="23"  cy="-49" r="2.8" fill="#ff2200"/>
-          <circle cx="36"  cy="-39" r="2.8" fill="#ff2200"/>
-          <circle cx="42"  cy="-23" r="2.8" fill="#ff2200"/>
+  <div id="roulette-row">
+    <!-- LYCORIS (left) -->
+    <div id="lycoris-wrap">
+      <svg id="lycoris-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+        <path id="stem" d="M100 400 Q95 300 100 200"
+              stroke="#660000" stroke-width="4" fill="none"
+              stroke-dasharray="230" stroke-dashoffset="230"/>
+        <path id="leaf1" d="M98 310 Q70 290 58 268"
+              stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
+        <path id="leaf2" d="M102 275 Q132 255 144 232"
+              stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
+        <g id="fhead" transform="translate(100,195)" opacity="0">
+          <g id="stamens" opacity="0">
+            <line x1="0" y1="0" x2="-32" y2="-46" stroke="#cc0000" stroke-width="1.3"/>
+            <line x1="0" y1="0" x2="-16" y2="-52" stroke="#cc0000" stroke-width="1.3"/>
+            <line x1="0" y1="0" x2="5"   y2="-54" stroke="#cc0000" stroke-width="1.3"/>
+            <line x1="0" y1="0" x2="23"  y2="-49" stroke="#cc0000" stroke-width="1.3"/>
+            <line x1="0" y1="0" x2="36"  y2="-39" stroke="#cc0000" stroke-width="1.3"/>
+            <line x1="0" y1="0" x2="42"  y2="-23" stroke="#cc0000" stroke-width="1.3"/>
+            <circle cx="-32" cy="-46" r="2.8" fill="#ff2200"/>
+            <circle cx="-16" cy="-52" r="2.8" fill="#ff2200"/>
+            <circle cx="5"   cy="-54" r="2.8" fill="#ff2200"/>
+            <circle cx="23"  cy="-49" r="2.8" fill="#ff2200"/>
+            <circle cx="36"  cy="-39" r="2.8" fill="#ff2200"/>
+            <circle cx="42"  cy="-23" r="2.8" fill="#ff2200"/>
+          </g>
+          <path class="pp" d="M0,0 Q-50,-20 -55,-60 Q-30,-40 0,-10 Z" fill="#cc0000" opacity="0"/>
+          <path class="pp" d="M0,0 Q-40,-50 -20,-80 Q-10,-50 0,-10 Z" fill="#cc0000" opacity="0"/>
+          <path class="pp" d="M0,0 Q0,-60 30,-75 Q10,-45 0,-10 Z"     fill="#cc0000" opacity="0"/>
+          <path class="pp" d="M0,0 Q45,-40 55,-65 Q25,-35 0,-10 Z"    fill="#cc0000" opacity="0"/>
+          <path class="pp" d="M0,0 Q55,-5 50,-45 Q25,-15 0,-10 Z"     fill="#cc0000" opacity="0"/>
+          <path class="pp" d="M0,0 Q55,25 40,-20 Q20,-5 0,-10 Z"      fill="#cc0000" opacity="0"/>
         </g>
-        <path class="pp" d="M0,0 Q-50,-20 -55,-60 Q-30,-40 0,-10 Z" fill="#cc0000" opacity="0"/>
-        <path class="pp" d="M0,0 Q-40,-50 -20,-80 Q-10,-50 0,-10 Z" fill="#cc0000" opacity="0"/>
-        <path class="pp" d="M0,0 Q0,-60 30,-75 Q10,-45 0,-10 Z"     fill="#cc0000" opacity="0"/>
-        <path class="pp" d="M0,0 Q45,-40 55,-65 Q25,-35 0,-10 Z"    fill="#cc0000" opacity="0"/>
-        <path class="pp" d="M0,0 Q55,-5 50,-45 Q25,-15 0,-10 Z"     fill="#cc0000" opacity="0"/>
-        <path class="pp" d="M0,0 Q55,25 40,-20 Q20,-5 0,-10 Z"      fill="#cc0000" opacity="0"/>
-      </g>
-    </svg>
+      </svg>
+    </div>
+
+    <!-- WIDGET (right of lycoris) -->
+    <div id="widget">
+      <div class="widget-outer">
+        <div class="slot-viewport">
+          <div class="slot-center"></div>
+          <div id="slot-track"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- WIDGET (right of lycoris) -->
-  <div id="widget">
-    <div class="widget-outer">
-      <div class="slot-viewport">
-        <div class="slot-center"></div>
-        <div id="slot-track"></div>
-      </div>
-      <div id="winner-row"><div id="winner-text"></div></div>
-    </div>
+  <!-- WINNER TEXT: outside widget, below -->
+  <div id="winner-outside">
+    <div id="winner-outside-text"></div>
   </div>
 </div>
 
@@ -312,9 +334,15 @@ function resetTrack() {
 }
 
 /* =========================================================
-   PETALS
+   PETALS — tracked so we can remove them cleanly
 ========================================================= */
+let activePetals = [];
+
 function spawnPetals() {
+  // Remove any leftover petals first
+  activePetals.forEach(p => p.remove());
+  activePetals = [];
+
   for (let i = 0; i < 16; i++) {
     const p = document.createElement('div');
     p.className = 'fall-petal';
@@ -325,6 +353,7 @@ function spawnPetals() {
     p.style.animationDuration = (5 + Math.random() * 8) + 's';
     p.style.animationDelay   = (Math.random() * 10) + 's';
     document.body.appendChild(p);
+    activePetals.push(p);
   }
 }
 
@@ -422,7 +451,7 @@ function doSpin(winnerLabel) {
   resetTrack();
 
   allCards.forEach(c => c.el.classList.remove('winner'));
-  const wt = document.getElementById('winner-text');
+  const wt = document.getElementById('winner-outside-text');
   wt.classList.remove('show');
 
   // Find which lot index matches the winner label
@@ -442,7 +471,10 @@ function doSpin(winnerLabel) {
       // After animation ends
       setTimeout(() => {
         allCards[landCardIdx].el.classList.add('winner');
-        wt.textContent = `✦ ${OPTIONS[lotIdx].label} ✦`;
+
+        // Winner text outside widget
+        const wt = document.getElementById('winner-outside-text');
+        wt.textContent = OPTIONS[lotIdx].label;
         wt.classList.add('show');
 
         // Save to Firebase history
@@ -450,14 +482,6 @@ function doSpin(winnerLabel) {
           value: OPTIONS[lotIdx].label,
           time: Date.now()
         });
-
-        // Glow flash
-        const outer = document.querySelector('.widget-outer');
-        outer.style.transition = 'box-shadow 0.4s ease-in-out';
-        outer.style.boxShadow = '0 0 60px #ff0000cc, 0 0 120px #cc000099, inset 0 0 22px #1a0000';
-        setTimeout(() => {
-          outer.style.boxShadow = '0 0 18px #ff000055, 0 0 50px #cc000022, inset 0 0 22px #1a0000';
-        }, 500);
 
         // Hide everything after 3.5s
         setTimeout(hideAll, 3500);
@@ -471,14 +495,20 @@ function hideAll() {
   root.style.transition = 'opacity 1.2s ease-in';
   root.style.opacity = '0';
 
-  document.querySelectorAll('.fall-petal').forEach(p => {
-    p.style.animationPlayState = 'paused';
-    p.style.transition = 'opacity 1.2s';
+  // Fade out petals then remove from DOM entirely
+  activePetals.forEach(p => {
+    p.style.transition = 'opacity 1s';
     p.style.opacity = '0';
   });
 
   setTimeout(() => {
+    activePetals.forEach(p => p.remove());
+    activePetals = [];
     root.style.display = 'none';
+    // Reset winner text for next time
+    const wt = document.getElementById('winner-outside-text');
+    wt.classList.remove('show');
+    wt.textContent = '';
     spinning = false;
   }, 1300);
 }
@@ -506,7 +536,7 @@ db.ref("spinCommand").on("value", snap => {
     document.querySelectorAll('.pp').forEach(p => { p.style.opacity='0'; p.style.transform='scale(0.2)'; });
     document.getElementById('widget').style.opacity = '0';
     document.getElementById('widget').style.transform = 'scaleX(0)';
-    document.getElementById('winner-text').classList.remove('show');
+    document.getElementById('winner-outside-text').classList.remove('show');
 
     runIntro().then(() => doSpin(data.label));
   } else {
