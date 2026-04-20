@@ -2,291 +2,317 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Лента-рулетка</title>
+<title>Slot Roulette</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
-  * { margin:0; padding:0; box-sizing:border-box; }
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
 
-  body {
-    background: #000;
-    width: 1280px;
-    height: 720px;
-    overflow: hidden;
-    font-family: 'Cinzel', serif;
-  }
+body {
+  background: transparent;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  font-family: 'Cinzel', serif;
+  position: relative;
+}
 
-  /* ===== FALLING PETALS ===== */
-  .fall-petal {
-    position: absolute;
-    border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
-    background: linear-gradient(180deg, #cc0000, #660000);
-    opacity: 0;
-    animation: fallPetal linear infinite;
-    pointer-events: none;
-    z-index: 50;
-  }
-  @keyframes fallPetal {
-    0%   { transform: translateY(-20px) rotate(0deg);   opacity: 0.85; }
-    100% { transform: translateY(740px) rotate(420deg); opacity: 0; }
-  }
+/* ===== ROOT CONTAINER: top-right area ===== */
+#root {
+  position: absolute;
+  top: 60px;
+  right: 30px;
+  display: flex;
+  align-items: flex-end;
+  gap: 0px;
+  opacity: 0;
+}
 
-  /* ===== LYCORIS ===== */
-  #lycoris-wrap {
-    position: absolute;
-    right: 200px;
-    top: 30px;
-    width: 90px;
-    height: 180px;
-    z-index: 10;
-    opacity: 0;
-  }
-  #lycoris-svg { width: 100%; height: 100%; }
+/* ===== LYCORIS LEFT ===== */
+#lycoris-wrap {
+  width: 90px;
+  height: 200px;
+  flex-shrink: 0;
+  position: relative;
+  bottom: 0;
+}
+#lycoris-svg { width: 100%; height: 100%; }
 
-  /* ===== WIDGET ===== */
-  #widget {
-    position: absolute;
-    right: 20px;
-    top: 80px;
-    width: 480px;
-    opacity: 0;
-    transform-origin: right top;
-    transform: scaleX(0);
-  }
+/* ===== WIDGET ===== */
+#widget {
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 0;
+}
 
-  .widget-outer {
-    background: #0d0d0d;
-    border: 2px solid #cc0000;
-    box-shadow: 0 0 18px #ff000055, 0 0 50px #cc000022, inset 0 0 22px #1a0000;
-    border-radius: 3px;
-    padding: 10px;
-    position: relative;
-  }
-  .widget-outer::before {
-    content:''; position:absolute; top:-2px; left:-2px;
-    width:18px; height:18px;
-    border-top:2px solid #ff2200; border-left:2px solid #ff2200;
-  }
-  .widget-outer::after {
-    content:''; position:absolute; bottom:-2px; right:-2px;
-    width:18px; height:18px;
-    border-bottom:2px solid #ff2200; border-right:2px solid #ff2200;
-  }
+.widget-outer {
+  background: #0d0d0d;
+  border: 2px solid #cc0000;
+  box-shadow: 0 0 18px #ff000055, 0 0 50px #cc000022, inset 0 0 22px #1a0000;
+  border-radius: 3px;
+  padding: 10px;
+  position: relative;
+  width: 480px;
+}
+.widget-outer::before {
+  content:''; position:absolute; top:-2px; left:-2px;
+  width:16px; height:16px;
+  border-top:2px solid #ff2200; border-left:2px solid #ff2200;
+}
+.widget-outer::after {
+  content:''; position:absolute; bottom:-2px; right:-2px;
+  width:16px; height:16px;
+  border-bottom:2px solid #ff2200; border-right:2px solid #ff2200;
+}
 
-  /* ===== SLOT ===== */
-  .slot-viewport {
-    position: relative;
-    height: 88px;
-    overflow: hidden;
-  }
+/* ===== SLOT VIEWPORT ===== */
+.slot-viewport {
+  position: relative;
+  height: 88px;
+  overflow: hidden;
+  /* clip cards to viewport */
+}
 
-  /* center highlight */
-  .slot-center {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    transform: translateX(-50%);
-    width: 152px;
-    height: 86px;
-    border: 2px solid #ff2200;
-    box-shadow: 0 0 16px #ff220077, inset 0 0 14px #ff220015;
-    z-index: 5;
-    pointer-events: none;
-    border-radius: 2px;
-  }
+/* center highlight frame */
+.slot-center {
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 86px;
+  border: 2px solid #ff2200;
+  box-shadow: 0 0 16px #ff220077, inset 0 0 14px #ff220015;
+  z-index: 5;
+  pointer-events: none;
+  border-radius: 2px;
+}
 
-  /* the moving strip */
-  #slot-track {
-    display: flex;
-    gap: 10px;
-    position: absolute;
-    top: 2px;
-    left: 0;
-    /* transition set via JS */
-  }
+/* THE TRACK: absolutely positioned, moved via JS */
+#slot-track {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  display: flex;
+  gap: 10px;
+  /* NO transition here — set via JS before spin */
+}
 
-  /* ===== CARD ===== */
-  .lot-card {
-    flex-shrink: 0;
-    width: 142px;
-    height: 82px;
-    background: #0d0d0d;
-    border: 1.5px solid #4a0000;
-    border-radius: 2px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    position: relative;
-  }
-  .lot-card::before {
-    content:''; position:absolute; inset:3px;
-    border:1px solid #220000; border-radius:1px;
-  }
-  .smoke {
-    position:absolute; border-radius:50%;
-    background: radial-gradient(circle, #3a000055 0%, transparent 70%);
-    pointer-events:none;
-  }
-  .s1 { width:34px; height:16px; bottom:4px; left:5px; opacity:.45; }
-  .s2 { width:22px; height:11px; top:5px;   right:7px; opacity:.3;  }
+/* ===== CARD ===== */
+.lot-card {
+  flex-shrink: 0;
+  width: 140px;
+  height: 82px;
+  background: #0d0d0d;
+  border: 1.5px solid #4a0000;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+}
+.lot-card::before {
+  content:''; position:absolute; inset:3px;
+  border:1px solid #1e0000; border-radius:1px;
+}
+.smoke {
+  position:absolute; border-radius:50%;
+  background: radial-gradient(circle, #3a000055 0%, transparent 70%);
+  pointer-events:none;
+}
+.s1 { width:32px; height:16px; bottom:4px; left:5px; opacity:.4; }
+.s2 { width:20px; height:10px; top:5px; right:6px; opacity:.28; }
 
-  .lot-icon { font-size:20px; line-height:1; }
-  .lot-name {
-    color:#cc2222;
-    font-size:7.5px;
-    letter-spacing:.1em;
-    text-transform:uppercase;
-    text-align:center;
-    padding:0 6px;
-    text-shadow:0 0 6px #ff000055;
-    line-height:1.35;
-  }
-  .lot-card.winner {
-    border-color:#ff2200;
-    background:#160000;
-    box-shadow:0 0 20px #ff220044, inset 0 0 14px #2a0000;
-  }
+.lot-icon { font-size:20px; line-height:1; }
+.lot-name {
+  color:#cc2222;
+  font-size:7.5px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  text-align:center;
+  padding:0 6px;
+  text-shadow:0 0 6px #ff000055;
+  line-height:1.35;
+}
+.lot-card.winner {
+  border-color:#ff2200;
+  background:#160000;
+  box-shadow:0 0 20px #ff220044, inset 0 0 14px #2a0000;
+}
 
-  /* ===== WINNER TEXT ===== */
-  #winner-row {
-    height:20px;
-    margin-top:7px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
-  }
-  #winner-text {
-    color:#ff3300;
-    font-size:10px;
-    letter-spacing:.2em;
-    text-shadow:0 0 12px #ff0000, 0 0 28px #ff000055;
-    opacity:0;
-    transform:translateY(14px);
-    transition:opacity .5s, transform .5s;
-  }
-  #winner-text.show { opacity:1; transform:translateY(0); }
+/* ===== WINNER TEXT ===== */
+#winner-row {
+  height:20px; margin-top:7px;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+}
+#winner-text {
+  color:#ff3300; font-size:10px; letter-spacing:.2em;
+  text-shadow:0 0 12px #ff0000, 0 0 28px #ff000055;
+  opacity:0; transform:translateY(14px);
+  transition:opacity .5s, transform .5s;
+}
+#winner-text.show { opacity:1; transform:translateY(0); }
+
+/* ===== PETALS ===== */
+.fall-petal {
+  position: fixed;
+  border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+  background: linear-gradient(180deg, #cc0000, #660000);
+  opacity: 0;
+  animation: fallPetal linear infinite;
+  pointer-events: none;
+  z-index: 999;
+}
+@keyframes fallPetal {
+  0%   { transform: translateY(-20px) rotate(0deg);   opacity:.85; }
+  100% { transform: translateY(760px) rotate(420deg); opacity:0;   }
+}
 </style>
 </head>
 <body>
 
-<!-- lycoris -->
-<div id="lycoris-wrap">
-  <svg id="lycoris-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
-    <path id="stem" d="M100 400 Q95 300 100 200"
-          stroke="#660000" stroke-width="4" fill="none"
-          stroke-dasharray="230" stroke-dashoffset="230"/>
-    <path id="leaf1" d="M98 310 Q70 290 58 268" stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
-    <path id="leaf2" d="M102 275 Q132 255 144 232" stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
-    <g id="fhead" transform="translate(100,195)" opacity="0">
-      <g id="stamens" opacity="0">
-        <line x1="0" y1="0" x2="-32" y2="-46" stroke="#cc0000" stroke-width="1.3"/>
-        <line x1="0" y1="0" x2="-16" y2="-52" stroke="#cc0000" stroke-width="1.3"/>
-        <line x1="0" y1="0" x2="5"   y2="-54" stroke="#cc0000" stroke-width="1.3"/>
-        <line x1="0" y1="0" x2="23"  y2="-49" stroke="#cc0000" stroke-width="1.3"/>
-        <line x1="0" y1="0" x2="36"  y2="-39" stroke="#cc0000" stroke-width="1.3"/>
-        <line x1="0" y1="0" x2="42"  y2="-23" stroke="#cc0000" stroke-width="1.3"/>
-        <circle cx="-32" cy="-46" r="2.8" fill="#ff2200"/>
-        <circle cx="-16" cy="-52" r="2.8" fill="#ff2200"/>
-        <circle cx="5"   cy="-54" r="2.8" fill="#ff2200"/>
-        <circle cx="23"  cy="-49" r="2.8" fill="#ff2200"/>
-        <circle cx="36"  cy="-39" r="2.8" fill="#ff2200"/>
-        <circle cx="42"  cy="-23" r="2.8" fill="#ff2200"/>
+<div id="root">
+  <!-- LYCORIS (left) -->
+  <div id="lycoris-wrap">
+    <svg id="lycoris-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+      <path id="stem" d="M100 400 Q95 300 100 200"
+            stroke="#660000" stroke-width="4" fill="none"
+            stroke-dasharray="230" stroke-dashoffset="230"/>
+      <path id="leaf1" d="M98 310 Q70 290 58 268"
+            stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
+      <path id="leaf2" d="M102 275 Q132 255 144 232"
+            stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
+      <g id="fhead" transform="translate(100,195)" opacity="0">
+        <g id="stamens" opacity="0">
+          <line x1="0" y1="0" x2="-32" y2="-46" stroke="#cc0000" stroke-width="1.3"/>
+          <line x1="0" y1="0" x2="-16" y2="-52" stroke="#cc0000" stroke-width="1.3"/>
+          <line x1="0" y1="0" x2="5"   y2="-54" stroke="#cc0000" stroke-width="1.3"/>
+          <line x1="0" y1="0" x2="23"  y2="-49" stroke="#cc0000" stroke-width="1.3"/>
+          <line x1="0" y1="0" x2="36"  y2="-39" stroke="#cc0000" stroke-width="1.3"/>
+          <line x1="0" y1="0" x2="42"  y2="-23" stroke="#cc0000" stroke-width="1.3"/>
+          <circle cx="-32" cy="-46" r="2.8" fill="#ff2200"/>
+          <circle cx="-16" cy="-52" r="2.8" fill="#ff2200"/>
+          <circle cx="5"   cy="-54" r="2.8" fill="#ff2200"/>
+          <circle cx="23"  cy="-49" r="2.8" fill="#ff2200"/>
+          <circle cx="36"  cy="-39" r="2.8" fill="#ff2200"/>
+          <circle cx="42"  cy="-23" r="2.8" fill="#ff2200"/>
+        </g>
+        <path class="pp" d="M0,0 Q-50,-20 -55,-60 Q-30,-40 0,-10 Z" fill="#cc0000" opacity="0"/>
+        <path class="pp" d="M0,0 Q-40,-50 -20,-80 Q-10,-50 0,-10 Z" fill="#cc0000" opacity="0"/>
+        <path class="pp" d="M0,0 Q0,-60 30,-75 Q10,-45 0,-10 Z"     fill="#cc0000" opacity="0"/>
+        <path class="pp" d="M0,0 Q45,-40 55,-65 Q25,-35 0,-10 Z"    fill="#cc0000" opacity="0"/>
+        <path class="pp" d="M0,0 Q55,-5 50,-45 Q25,-15 0,-10 Z"     fill="#cc0000" opacity="0"/>
+        <path class="pp" d="M0,0 Q55,25 40,-20 Q20,-5 0,-10 Z"      fill="#cc0000" opacity="0"/>
       </g>
-      <path class="pp" d="M0,0 Q-50,-20 -55,-60 Q-30,-40 0,-10 Z" fill="#cc0000" opacity="0"/>
-      <path class="pp" d="M0,0 Q-40,-50 -20,-80 Q-10,-50 0,-10 Z" fill="#cc0000" opacity="0"/>
-      <path class="pp" d="M0,0 Q0,-60 30,-75 Q10,-45 0,-10 Z"     fill="#cc0000" opacity="0"/>
-      <path class="pp" d="M0,0 Q45,-40 55,-65 Q25,-35 0,-10 Z"    fill="#cc0000" opacity="0"/>
-      <path class="pp" d="M0,0 Q55,-5 50,-45 Q25,-15 0,-10 Z"     fill="#cc0000" opacity="0"/>
-      <path class="pp" d="M0,0 Q55,25 40,-20 Q20,-5 0,-10 Z"      fill="#cc0000" opacity="0"/>
-    </g>
-  </svg>
-</div>
+    </svg>
+  </div>
 
-<!-- widget -->
-<div id="widget">
-  <div class="widget-outer">
-    <div class="slot-viewport">
-      <div class="slot-center"></div>
-      <div id="slot-track"></div>
+  <!-- WIDGET (right of lycoris) -->
+  <div id="widget">
+    <div class="widget-outer">
+      <div class="slot-viewport">
+        <div class="slot-center"></div>
+        <div id="slot-track"></div>
+      </div>
+      <div id="winner-row"><div id="winner-text"></div></div>
     </div>
-    <div id="winner-row"><div id="winner-text"></div></div>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
 /* =========================================================
-   LOTS
+   FIREBASE
 ========================================================= */
-const LOTS = [
-  { name:'Арт по персонажу', icon:'🎨' },
-  { name:'Озвучка',          icon:'🎤' },
-  { name:'Стрим по игре',    icon:'🎮' },
-  { name:'Чат-команда',      icon:'⚡' },
-  { name:'Рисунок Ликориса', icon:'🌺' },
-  { name:'Эмоут на канал',   icon:'✨' },
-  { name:'Особый лот',       icon:'💀' },
-  { name:'Сюрприз',          icon:'🎁' },
+const firebaseConfig = {
+  apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
+  authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
+  databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
+  projectId: "roulette-twitch-2c7a3"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* =========================================================
+   LOTS — loaded from Firebase, fallback to defaults
+========================================================= */
+const DEFAULT_LOTS = [
+  { label:'Арт по персонажу', weight:10 },
+  { label:'Озвучка',          weight:10 },
+  { label:'Стрим по игре',    weight:10 },
+  { label:'Чат-команда',      weight:10 },
+  { label:'Особый лот',       weight:10 },
+  { label:'Сюрприз',          weight:10 },
 ];
 
+let OPTIONS = DEFAULT_LOTS;
+
+const ICONS = ['🎨','🎤','🎮','⚡','🌺','✨','💀','🎁','🎲','🔮','🎯','🏆'];
+
+db.ref("options").on("value", snap => {
+  const val = snap.val();
+  if (val && Array.isArray(val) && val.length >= 2) {
+    OPTIONS = val;
+  }
+});
+
 /* =========================================================
-   BUILD INFINITE TRACK
-   We'll create many copies so we never run out of cards.
+   TRACK SETUP
 ========================================================= */
-const CARD_W   = 142;
-const GAP      = 10;
-const STEP     = CARD_W + GAP;
-const COPIES   = 8;               // 8 × 8 lots = 64 cards
-const N        = LOTS.length;
+const CARD_W  = 140;
+const GAP     = 10;
+const STEP    = CARD_W + GAP;
+const COPIES  = 10;   // plenty of cards so we never run out
 
-const trackEl = document.getElementById('slot-track');
-let cards = [];
+const trackEl   = document.getElementById('slot-track');
+let allCards    = [];
 
-function makeCard(lot) {
-  const d = document.createElement('div');
-  d.className = 'lot-card';
-  d.innerHTML = `<div class="smoke s1"></div><div class="smoke s2"></div>
-    <div class="lot-icon">${lot.icon}</div>
-    <div class="lot-name">${lot.name}</div>`;
-  return d;
+function iconFor(i) {
+  return ICONS[i % ICONS.length];
 }
 
-for (let c = 0; c < COPIES; c++) {
-  LOTS.forEach(lot => {
-    const card = makeCard(lot);
-    trackEl.appendChild(card);
-    cards.push(card);
-  });
+function buildTrack() {
+  trackEl.innerHTML = '';
+  allCards = [];
+  for (let c = 0; c < COPIES; c++) {
+    OPTIONS.forEach((lot, i) => {
+      const card = document.createElement('div');
+      card.className = 'lot-card';
+      card.innerHTML = `
+        <div class="smoke s1"></div>
+        <div class="smoke s2"></div>
+        <div class="lot-icon">${iconFor(i)}</div>
+        <div class="lot-name">${lot.label}</div>`;
+      trackEl.appendChild(card);
+      allCards.push({ el: card, lotIdx: i });
+    });
+  }
+}
+
+/* Center of viewport = half of 480-20px padding = 230px
+   Card center = 70px
+   left for card at index i: 230 - 70 - i*STEP = 160 - i*STEP  */
+const VP_CENTER  = (480 - 20) / 2;   // 230
+const CARD_HALF  = CARD_W / 2;        // 70
+
+function leftForCard(i) {
+  return VP_CENTER - CARD_HALF - i * STEP;
+}
+
+// Start at copy 3, lot 0
+const START_CARD = 3 * OPTIONS.length;
+
+function resetTrack() {
+  trackEl.style.transition = 'none';
+  trackEl.style.left = leftForCard(START_CARD) + 'px';
 }
 
 /* =========================================================
-   POSITIONING
-   We want the center card of the visible area to be
-   the "selected" card. The viewport is 480-20=460px wide.
-   Center of viewport = 230px.
-   Center of a card   = CARD_W/2 = 71px.
-   So: trackLeft such that card[i] center == 230px
-       trackLeft = 230 - 71 - i*STEP  =  159 - i*STEP
-========================================================= */
-const VIEWPORT_W    = 460;
-const CENTER_TARGET = VIEWPORT_W / 2;          // 230
-const CARD_CENTER   = CARD_W / 2;              // 71
-// offset that places card[i] in the center:
-// left = CENTER_TARGET - CARD_CENTER - i*STEP
-function offsetForCard(i) {
-  return CENTER_TARGET - CARD_CENTER - i * STEP;
-}
-
-// Start showing copy 2, lot 0  →  card index = 2*N
-const START_IDX = 2 * N;
-let currentLeft = offsetForCard(START_IDX);
-trackEl.style.left = currentLeft + 'px';
-trackEl.style.transition = 'none';
-
-/* =========================================================
-   FALLING PETALS
+   PETALS
 ========================================================= */
 function spawnPetals() {
   for (let i = 0; i < 16; i++) {
@@ -297,136 +323,211 @@ function spawnPetals() {
     p.style.width  = (3 + Math.random() * 5) + 'px';
     p.style.height = (10 + Math.random() * 14) + 'px';
     p.style.animationDuration = (5 + Math.random() * 8) + 's';
-    p.style.animationDelay   = (Math.random() * 12) + 's';
+    p.style.animationDelay   = (Math.random() * 10) + 's';
     document.body.appendChild(p);
   }
 }
 
 /* =========================================================
-   INTRO SEQUENCE
+   INTRO SEQUENCE  (anime.js-free — pure CSS + setTimeout)
 ========================================================= */
+function animEl(el, props, durationMs, easingFn) {
+  return new Promise(resolve => {
+    // Force reflow so transition applies
+    el.getBoundingClientRect();
+    const transStr = Object.keys(props).map(p => `${p} ${durationMs}ms ${easingFn}`).join(', ');
+    el.style.transition = transStr;
+    Object.assign(el.style, props);
+    setTimeout(resolve, durationMs);
+  });
+}
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function runIntro() {
-  // Show lycoris wrapper
-  document.getElementById('lycoris-wrap').style.opacity = '1';
+  // Show root (transparent container)
+  document.getElementById('root').style.opacity = '1';
 
-  // Stem
-  await new Promise(r => anime({
-    targets: '#stem',
-    strokeDashoffset: [230, 0],
-    duration: 900, easing: 'easeInOutQuad', complete: r
-  }));
+  const stem   = document.getElementById('stem');
+  const leaf1  = document.getElementById('leaf1');
+  const leaf2  = document.getElementById('leaf2');
+  const fhead  = document.getElementById('fhead');
+  const stmns  = document.getElementById('stamens');
+  const petals = Array.from(document.querySelectorAll('.pp'));
+  const widget = document.getElementById('widget');
 
-  // Leaves
-  anime({ targets:'#leaf1', opacity:[0,.85], duration:280, easing:'easeOutQuad' });
-  await sleep(130);
-  anime({ targets:'#leaf2', opacity:[0,.85], duration:280, easing:'easeOutQuad' });
+  // --- STEM DRAW ---
+  stem.style.transition = 'stroke-dashoffset 900ms ease-in-out';
+  stem.getBoundingClientRect();
+  stem.style.strokeDashoffset = '0';
+  await sleep(950);
+
+  // --- LEAVES ---
+  leaf1.style.transition = 'opacity 280ms ease-out';
+  leaf1.getBoundingClientRect();
+  leaf1.style.opacity = '0.85';
+  await sleep(140);
+  leaf2.style.transition = 'opacity 280ms ease-out';
+  leaf2.getBoundingClientRect();
+  leaf2.style.opacity = '0.85';
   await sleep(300);
 
-  // Flower head
-  anime({ targets:'#fhead', opacity:[0,1], duration:200, easing:'easeOutQuad' });
-  await sleep(130);
+  // --- FLOWER HEAD ---
+  fhead.style.transition = 'opacity 200ms ease-out';
+  fhead.getBoundingClientRect();
+  fhead.style.opacity = '1';
+  await sleep(140);
 
-  // Stamens
-  anime({ targets:'#stamens', opacity:[0,1], duration:280, easing:'easeOutBack' });
-  await sleep(80);
+  // --- STAMENS ---
+  stmns.style.transition = 'opacity 280ms ease-out';
+  stmns.getBoundingClientRect();
+  stmns.style.opacity = '1';
+  await sleep(100);
 
-  // Petals
-  for (const p of document.querySelectorAll('.pp')) {
-    anime({ targets:p, opacity:[0,1], scale:[0.2,1], duration:210, easing:'easeOutBack' });
-    await sleep(55);
+  // --- PETALS one by one ---
+  for (const p of petals) {
+    p.style.transition = 'opacity 210ms ease-out, transform 210ms ease-out';
+    p.style.transformOrigin = '0 -10px';
+    p.style.transform = 'scale(0.2)';
+    p.getBoundingClientRect();
+    p.style.opacity = '1';
+    p.style.transform = 'scale(1)';
+    await sleep(58);
   }
 
   await sleep(350);
 
-  // Widget slides out from right
-  await new Promise(r => anime({
-    targets: '#widget',
-    opacity: [0, 1],
-    scaleX:  [0, 1],
-    duration: 620, easing: 'easeOutExpo', complete: r
-  }));
+  // --- WIDGET SLIDES OUT ---
+  widget.style.transition = 'opacity 600ms ease-out, transform 600ms cubic-bezier(0.16, 1, 0.3, 1)';
+  widget.getBoundingClientRect();
+  widget.style.opacity = '1';
+  widget.style.transform = 'scaleX(1)';
+  await sleep(650);
 
   spawnPetals();
 }
 
 /* =========================================================
-   SPIN
+   SPIN  — pure CSS transition on `left`
 ========================================================= */
 let spinning = false;
+let lastSpinTs = 0;
 
-function triggerSpin() {
+function doSpin(winnerLabel) {
   if (spinning) return;
   spinning = true;
 
-  cards.forEach(c => c.classList.remove('winner'));
+  // Rebuild track fresh each spin so we always have cards
+  buildTrack();
+  resetTrack();
+
+  allCards.forEach(c => c.el.classList.remove('winner'));
   const wt = document.getElementById('winner-text');
   wt.classList.remove('show');
 
-  // Pick winner lot index (0..N-1)
-  const winnerLot = Math.floor(Math.random() * N);
+  // Find which lot index matches the winner label
+  const winnerLotIdx = OPTIONS.findIndex(o => o.label === winnerLabel);
+  const lotIdx = winnerLotIdx >= 0 ? winnerLotIdx : Math.floor(Math.random() * OPTIONS.length);
 
-  // We want to land on copy 5 (index 5*N + winnerLot)
-  // so there's a long scroll from copy 2 where we start
-  const landIdx = 5 * N + winnerLot;
-  const targetLeft = offsetForCard(landIdx);
+  // Land on copy 7 — far enough from START_CARD (copy 3) to feel long
+  const landCardIdx = 7 * OPTIONS.length + lotIdx;
 
-  // Use CSS transition for smooth deceleration
-  trackEl.style.transition = 'left 4.5s cubic-bezier(0.12, 0.9, 0.18, 1.0)';
-  trackEl.style.left = targetLeft + 'px';
+  // Force no-transition reflow, then apply transition
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const targetLeft = leftForCard(landCardIdx);
+      trackEl.style.transition = 'left 4.5s cubic-bezier(0.05, 0.9, 0.15, 1.0)';
+      trackEl.style.left = targetLeft + 'px';
 
-  setTimeout(() => {
-    // Mark winner
-    cards[landIdx].classList.add('winner');
-    currentLeft = targetLeft;
+      // After animation ends
+      setTimeout(() => {
+        allCards[landCardIdx].el.classList.add('winner');
+        wt.textContent = `✦ ${OPTIONS[lotIdx].label} ✦`;
+        wt.classList.add('show');
 
-    // Show winner text
-    wt.textContent = `✦ ${LOTS[winnerLot].name} ✦`;
-    wt.classList.add('show');
+        // Save to Firebase history
+        db.ref("history").push({
+          value: OPTIONS[lotIdx].label,
+          time: Date.now()
+        });
 
-    // Glow flash
-    anime({
-      targets: '.widget-outer',
-      boxShadow: [
-        '0 0 18px #ff000055, 0 0 50px #cc000022, inset 0 0 22px #1a0000',
-        '0 0 60px #ff0000cc, 0 0 110px #cc000088, inset 0 0 22px #1a0000',
-        '0 0 18px #ff000055, 0 0 50px #cc000022, inset 0 0 22px #1a0000',
-      ],
-      duration: 800, easing: 'easeInOutSine'
+        // Glow flash
+        const outer = document.querySelector('.widget-outer');
+        outer.style.transition = 'box-shadow 0.4s ease-in-out';
+        outer.style.boxShadow = '0 0 60px #ff0000cc, 0 0 120px #cc000099, inset 0 0 22px #1a0000';
+        setTimeout(() => {
+          outer.style.boxShadow = '0 0 18px #ff000055, 0 0 50px #cc000022, inset 0 0 22px #1a0000';
+        }, 500);
+
+        // Hide everything after 3.5s
+        setTimeout(hideAll, 3500);
+      }, 4600);
     });
-
-    // After 3 seconds — everything fades out
-    setTimeout(hideAll, 3000);
-
-  }, 4600); // slightly after transition ends
+  });
 }
 
 function hideAll() {
-  // Stop petals
+  const root = document.getElementById('root');
+  root.style.transition = 'opacity 1.2s ease-in';
+  root.style.opacity = '0';
+
   document.querySelectorAll('.fall-petal').forEach(p => {
     p.style.animationPlayState = 'paused';
+    p.style.transition = 'opacity 1.2s';
+    p.style.opacity = '0';
   });
 
-  anime({
-    targets: ['#widget', '#lycoris-wrap'],
-    opacity: [1, 0],
-    duration: 1200,
-    easing: 'easeInQuad',
-    complete() {
-      document.getElementById('widget').style.display = 'none';
-      document.getElementById('lycoris-wrap').style.display = 'none';
-    }
-  });
+  setTimeout(() => {
+    root.style.display = 'none';
+    spinning = false;
+  }, 1300);
 }
 
-// expose for Firebase
-window.triggerSpin = triggerSpin;
+/* =========================================================
+   FIREBASE SPIN TRIGGER — same as spin.html
+========================================================= */
+db.ref("spinCommand").on("value", snap => {
+  const data = snap.val();
+  if (!data || !data.ts) return;
+  if (data.ts <= lastSpinTs) return;
+  lastSpinTs = data.ts;
 
-// click anywhere to test
-document.body.addEventListener('click', triggerSpin);
+  // If widget is hidden, rebuild and replay intro first
+  const root = document.getElementById('root');
+  if (root.style.display === 'none') {
+    root.style.display = 'flex';
+    root.style.opacity = '0';
+    // Reset flower
+    document.getElementById('stem').style.strokeDashoffset = '230';
+    document.getElementById('leaf1').style.opacity = '0';
+    document.getElementById('leaf2').style.opacity = '0';
+    document.getElementById('fhead').style.opacity = '0';
+    document.getElementById('stamens').style.opacity = '0';
+    document.querySelectorAll('.pp').forEach(p => { p.style.opacity='0'; p.style.transform='scale(0.2)'; });
+    document.getElementById('widget').style.opacity = '0';
+    document.getElementById('widget').style.transform = 'scaleX(0)';
+    document.getElementById('winner-text').classList.remove('show');
 
-window.addEventListener('load', runIntro);
+    runIntro().then(() => doSpin(data.label));
+  } else {
+    doSpin(data.label);
+  }
+});
+
+/* =========================================================
+   BOOT
+========================================================= */
+window.addEventListener('load', () => {
+  buildTrack();
+  resetTrack();
+  runIntro();
+
+  // DEV: click to test spin
+  document.body.addEventListener('click', () => {
+    const randomLot = OPTIONS[Math.floor(Math.random() * OPTIONS.length)];
+    db.ref("spinCommand").set({ label: randomLot.label, ts: Date.now() });
+  });
+});
 </script>
 </body>
 </html>
