@@ -19,18 +19,35 @@
     justify-content: center;
   }
 
-  /* ===================== LYCORIS FLOWER ===================== */
+  /* ===================== FALLING PETALS ===================== */
+  .fall-petal {
+    position: absolute;
+    border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+    background: linear-gradient(180deg, #cc0000, #660000);
+    opacity: 0;
+    animation: fallPetal linear infinite;
+    top: -20px;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  @keyframes fallPetal {
+    0%   { transform: translateY(0) rotate(0deg) translateX(0); opacity: 0.8; }
+    100% { transform: translateY(750px) rotate(400deg) translateX(50px); opacity: 0; }
+  }
+
+  /* ===================== LYCORIS ===================== */
   #lycoris-wrap {
     position: absolute;
-    left: 60px;
+    left: 30px;
     top: 50%;
-    transform: translateY(-50%);
-    width: 200px;
-    height: 400px;
+    transform: translateY(-55%);
+    width: 110px;
+    height: 220px;
     z-index: 10;
   }
 
-  .lycoris-svg {
+  #lycoris-svg {
     width: 100%;
     height: 100%;
     opacity: 0;
@@ -39,167 +56,126 @@
   /* ===================== WIDGET ===================== */
   #widget {
     position: absolute;
-    left: 200px;
+    left: 120px;
     top: 50%;
     transform: translateY(-50%) scaleX(0);
     transform-origin: left center;
     opacity: 0;
-    width: 950px;
+    width: 500px;
   }
 
   .widget-outer {
     position: relative;
-    background: #111;
-    border: 3px solid #cc0000;
+    background: #0d0d0d;
+    border: 2.5px solid #cc0000;
     box-shadow:
-      0 0 20px #ff000066,
-      0 0 60px #cc000033,
-      inset 0 0 30px #1a0000;
-    border-radius: 4px;
-    padding: 12px;
+      0 0 16px #ff000055,
+      0 0 40px #cc000022,
+      inset 0 0 20px #1a0000;
+    border-radius: 3px;
+    padding: 10px;
   }
 
-  /* Corner decorations */
   .widget-outer::before,
   .widget-outer::after {
     content: '';
     position: absolute;
-    width: 30px;
-    height: 30px;
+    width: 20px;
+    height: 20px;
     border-color: #ff2200;
     border-style: solid;
   }
-  .widget-outer::before {
-    top: -3px; left: -3px;
-    border-width: 3px 0 0 3px;
-  }
-  .widget-outer::after {
-    bottom: -3px; right: -3px;
-    border-width: 0 3px 3px 0;
-  }
+  .widget-outer::before { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
+  .widget-outer::after  { bottom: -2px; right: -2px; border-width: 0 2px 2px 0; }
 
-  /* ===================== SLOT TRACK ===================== */
+  /* ===================== SLOT VIEWPORT ===================== */
   .slot-viewport {
     position: relative;
     overflow: hidden;
-    height: 160px;
+    height: 90px;
     display: flex;
     align-items: center;
   }
 
-  /* Center highlight overlay */
-  .slot-viewport::before {
-    content: '';
+  /* Center highlight — simple box, no side masks */
+  .slot-center-highlight {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    width: 290px;
-    height: 100%;
-    border: 2.5px solid #ff2200;
-    box-shadow: 0 0 18px #ff220088, inset 0 0 18px #ff220022;
+    width: 158px;
+    height: 88px;
+    border: 2px solid #ff2200;
+    box-shadow: 0 0 14px #ff220077, inset 0 0 12px #ff220015;
     z-index: 5;
     pointer-events: none;
-    border-radius: 3px;
-  }
-
-  /* Side fade masks */
-  .slot-viewport::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      to right,
-      #111 0%,
-      transparent 18%,
-      transparent 82%,
-      #111 100%
-    );
-    z-index: 4;
-    pointer-events: none;
+    border-radius: 2px;
   }
 
   .slot-track {
     display: flex;
-    gap: 16px;
+    gap: 10px;
     will-change: transform;
-    padding: 0 8px;
+    position: relative;
   }
 
   /* ===================== LOT CARD ===================== */
   .lot-card {
     flex-shrink: 0;
-    width: 260px;
-    height: 140px;
+    width: 148px;
+    height: 84px;
     background: #0d0d0d;
-    border: 2px solid #660000;
+    border: 1.5px solid #550000;
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    border-radius: 3px;
-    transition: border-color 0.3s;
+    gap: 5px;
+    border-radius: 2px;
   }
 
-  /* Card corner ornaments (SVG inline) */
   .lot-card::before {
     content: '';
     position: absolute;
-    inset: 4px;
-    border: 1px solid #3a0000;
-    border-radius: 2px;
+    inset: 3px;
+    border: 1px solid #2a0000;
+    border-radius: 1px;
     pointer-events: none;
   }
 
-  /* Cloud smoke decoration — CSS only */
   .smoke {
     position: absolute;
     border-radius: 50%;
-    background: radial-gradient(circle, #2a000088 0%, transparent 70%);
+    background: radial-gradient(circle, #3a000066 0%, transparent 70%);
     pointer-events: none;
   }
-  .smoke-1 { width: 60px; height: 30px; bottom: 8px; left: 10px; opacity: 0.6; }
-  .smoke-2 { width: 40px; height: 20px; top: 12px; right: 14px; opacity: 0.4; }
+  .smoke-1 { width: 36px; height: 18px; bottom: 4px; left: 6px; opacity: 0.5; }
+  .smoke-2 { width: 24px; height: 12px; top: 6px; right: 8px; opacity: 0.35; }
 
-  .lot-icon {
-    font-size: 36px;
-    line-height: 1;
-  }
+  .lot-icon { font-size: 22px; line-height: 1; }
 
   .lot-name {
     color: #cc3333;
-    font-size: 13px;
-    letter-spacing: 0.12em;
+    font-size: 8px;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     text-align: center;
-    padding: 0 12px;
-    text-shadow: 0 0 8px #ff000077;
+    padding: 0 8px;
+    text-shadow: 0 0 6px #ff000066;
+    line-height: 1.3;
   }
 
   .lot-card.winner {
     border-color: #ff2200;
-    background: #1a0000;
-    box-shadow: 0 0 25px #ff220055, inset 0 0 20px #2a0000;
+    background: #180000;
+    box-shadow: 0 0 18px #ff220044, inset 0 0 12px #2a0000;
   }
 
-  /* ===================== HEADER ===================== */
-  .widget-header {
-    text-align: center;
-    margin-bottom: 10px;
-    color: #cc0000;
-    font-size: 11px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    text-shadow: 0 0 10px #ff0000aa;
-    opacity: 0.7;
-  }
-
-  /* ===================== WINNER DISPLAY ===================== */
+  /* ===================== WINNER TEXT ===================== */
   #winner-display {
     text-align: center;
-    margin-top: 10px;
-    height: 36px;
+    margin-top: 8px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -208,437 +184,219 @@
 
   #winner-text {
     color: #ff3300;
-    font-size: 16px;
-    letter-spacing: 0.25em;
-    text-shadow: 0 0 20px #ff0000, 0 0 40px #ff000066;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-shadow: 0 0 14px #ff0000, 0 0 30px #ff000055;
     opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.6s, transform 0.6s;
+    transform: translateY(14px);
+    transition: opacity 0.5s, transform 0.5s;
   }
 
   #winner-text.show {
     opacity: 1;
     transform: translateY(0);
   }
-
-  /* ===================== SPIN BUTTON ===================== */
-  #spin-btn {
-    display: block;
-    margin: 16px auto 4px;
-    padding: 10px 40px;
-    background: transparent;
-    border: 2px solid #cc0000;
-    color: #cc0000;
-    font-family: 'Cinzel', serif;
-    font-size: 13px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 0 10px #cc000044;
-    position: relative;
-    overflow: hidden;
-  }
-
-  #spin-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: #cc000000;
-    transition: background 0.3s;
-  }
-
-  #spin-btn:hover::before { background: #cc000022; }
-  #spin-btn:hover { box-shadow: 0 0 20px #cc000088; }
-  #spin-btn:disabled { opacity: 0.4; cursor: default; }
-
-  /* ===================== LYCORIS PETALS (CSS) ===================== */
-  .petal {
-    position: absolute;
-    transform-origin: bottom center;
-    opacity: 0;
-  }
-
-  /* Falling petals ambient */
-  .fall-petal {
-    position: absolute;
-    width: 6px;
-    height: 18px;
-    border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
-    background: linear-gradient(180deg, #cc0000, #660000);
-    opacity: 0;
-    animation: fallPetal linear infinite;
-    top: -20px;
-  }
-
-  @keyframes fallPetal {
-    0% { transform: translateY(0) rotate(0deg) translateX(0); opacity: 0.7; }
-    100% { transform: translateY(750px) rotate(360deg) translateX(40px); opacity: 0; }
-  }
-
-  /* ===================== STORYBOARD FRAMES ===================== */
-  #storyboard {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    opacity: 0;
-    transition: opacity 0.5s;
-  }
-
-  .sb-frame {
-    width: 60px;
-    height: 70px;
-    border: 1.5px solid #550000;
-    background: #0a0000;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding-bottom: 4px;
-    border-radius: 2px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .sb-frame svg {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-  }
 </style>
 </head>
 <body>
 
-<!-- Falling petals ambient -->
-<div id="petals-container"></div>
-
-<!-- Storyboard frames top (shown during lycoris growth) -->
-<div id="storyboard">
-  <div class="sb-frame" id="sb1"></div>
-  <div class="sb-frame" id="sb2"></div>
-  <div class="sb-frame" id="sb3"></div>
-  <div class="sb-frame" id="sb4"></div>
-  <div class="sb-frame" id="sb5"></div>
-</div>
-
-<!-- Lycoris flower -->
 <div id="lycoris-wrap">
-  <svg class="lycoris-svg" id="lycoris-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
-    <!-- Stem -->
-    <path id="stem" d="M100 400 Q95 300 100 200" stroke="#660000" stroke-width="3" fill="none"
-          stroke-dasharray="220" stroke-dashoffset="220"/>
-    <!-- Leaves -->
-    <path id="leaf1" d="M98 300 Q70 280 60 260" stroke="#440000" stroke-width="2" fill="none" opacity="0"/>
-    <path id="leaf2" d="M102 270 Q130 250 140 230" stroke="#440000" stroke-width="2" fill="none" opacity="0"/>
-    <!-- Petals group — 6 petals radiating -->
+  <svg id="lycoris-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+    <path id="stem" d="M100 400 Q95 300 100 200"
+          stroke="#660000" stroke-width="4" fill="none"
+          stroke-dasharray="230" stroke-dashoffset="230"/>
+    <path id="leaf1" d="M98 310 Q70 290 58 268" stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
+    <path id="leaf2" d="M102 275 Q132 255 144 232" stroke="#440000" stroke-width="2.5" fill="none" opacity="0"/>
     <g id="flower-head" transform="translate(100,195)" opacity="0">
-      <!-- Stamens -->
       <g id="stamens" opacity="0">
-        <line x1="0" y1="0" x2="-30" y2="-45" stroke="#cc0000" stroke-width="1.2"/>
-        <line x1="0" y1="0" x2="-15" y2="-50" stroke="#cc0000" stroke-width="1.2"/>
-        <line x1="0" y1="0" x2="5"  y2="-52" stroke="#cc0000" stroke-width="1.2"/>
-        <line x1="0" y1="0" x2="22" y2="-47" stroke="#cc0000" stroke-width="1.2"/>
-        <line x1="0" y1="0" x2="34" y2="-38" stroke="#cc0000" stroke-width="1.2"/>
-        <line x1="0" y1="0" x2="40" y2="-22" stroke="#cc0000" stroke-width="1.2"/>
-        <!-- Stamen tips -->
-        <circle cx="-30" cy="-45" r="2.5" fill="#ff2200"/>
-        <circle cx="-15" cy="-50" r="2.5" fill="#ff2200"/>
-        <circle cx="5"  cy="-52" r="2.5" fill="#ff2200"/>
-        <circle cx="22" cy="-47" r="2.5" fill="#ff2200"/>
-        <circle cx="34" cy="-38" r="2.5" fill="#ff2200"/>
-        <circle cx="40" cy="-22" r="2.5" fill="#ff2200"/>
+        <line x1="0" y1="0" x2="-32" y2="-46" stroke="#cc0000" stroke-width="1.3"/>
+        <line x1="0" y1="0" x2="-16" y2="-52" stroke="#cc0000" stroke-width="1.3"/>
+        <line x1="0" y1="0" x2="5"   y2="-54" stroke="#cc0000" stroke-width="1.3"/>
+        <line x1="0" y1="0" x2="23"  y2="-49" stroke="#cc0000" stroke-width="1.3"/>
+        <line x1="0" y1="0" x2="36"  y2="-39" stroke="#cc0000" stroke-width="1.3"/>
+        <line x1="0" y1="0" x2="42"  y2="-23" stroke="#cc0000" stroke-width="1.3"/>
+        <circle cx="-32" cy="-46" r="2.8" fill="#ff2200"/>
+        <circle cx="-16" cy="-52" r="2.8" fill="#ff2200"/>
+        <circle cx="5"   cy="-54" r="2.8" fill="#ff2200"/>
+        <circle cx="23"  cy="-49" r="2.8" fill="#ff2200"/>
+        <circle cx="36"  cy="-39" r="2.8" fill="#ff2200"/>
+        <circle cx="42"  cy="-23" r="2.8" fill="#ff2200"/>
       </g>
-      <!-- Petals (6, curving outward like lycoris) -->
       <path class="petal-path" d="M0,0 Q-50,-20 -55,-60 Q-30,-40 0,-10 Z" fill="#cc0000" opacity="0"/>
       <path class="petal-path" d="M0,0 Q-40,-50 -20,-80 Q-10,-50 0,-10 Z" fill="#cc0000" opacity="0"/>
-      <path class="petal-path" d="M0,0 Q0,-60 30,-75 Q10,-45 0,-10 Z" fill="#cc0000" opacity="0"/>
-      <path class="petal-path" d="M0,0 Q45,-40 55,-65 Q25,-35 0,-10 Z" fill="#cc0000" opacity="0"/>
-      <path class="petal-path" d="M0,0 Q55,-5 50,-45 Q25,-15 0,-10 Z"  fill="#cc0000" opacity="0"/>
-      <path class="petal-path" d="M0,0 Q55,25 40,-20 Q20,-5 0,-10 Z"   fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q0,-60 30,-75 Q10,-45 0,-10 Z"     fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q45,-40 55,-65 Q25,-35 0,-10 Z"    fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q55,-5 50,-45 Q25,-15 0,-10 Z"     fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q55,25 40,-20 Q20,-5 0,-10 Z"      fill="#cc0000" opacity="0"/>
     </g>
   </svg>
 </div>
 
-<!-- Main widget -->
 <div id="widget">
   <div class="widget-outer">
-    <div class="widget-header">— Рулетка лотов —</div>
-
     <div class="slot-viewport">
+      <div class="slot-center-highlight"></div>
       <div class="slot-track" id="slot-track"></div>
     </div>
-
     <div id="winner-display">
       <div id="winner-text"></div>
     </div>
-
-    <button id="spin-btn" onclick="startSpin()">✦ Крутить ✦</button>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
 <script>
-// ===================== DATA =====================
 const LOTS = [
   { name: 'Арт по вашему персонажу', icon: '🎨' },
-  { name: 'Озвучка персонажа', icon: '🎤' },
-  { name: 'Стрим по вашей игре', icon: '🎮' },
-  { name: 'Чат-команда', icon: '⚡' },
-  { name: 'Рисунок Ликориса', icon: '🌺' },
-  { name: 'Эмоут на канал', icon: '✨' },
-  { name: 'Особый лот', icon: '💀' },
-  { name: 'Сюрприз', icon: '🎁' },
+  { name: 'Озвучка персонажа',       icon: '🎤' },
+  { name: 'Стрим по вашей игре',     icon: '🎮' },
+  { name: 'Чат-команда',             icon: '⚡' },
+  { name: 'Рисунок Ликориса',        icon: '🌺' },
+  { name: 'Эмоут на канал',          icon: '✨' },
+  { name: 'Особый лот',              icon: '💀' },
+  { name: 'Сюрприз',                 icon: '🎁' },
 ];
 
-// ===================== TRACK SETUP =====================
+const CARD_W  = 148;
+const GAP     = 10;
+const STEP    = CARD_W + GAP;
+const SETS    = 6; // enough cards to scroll through
+
 const track = document.getElementById('slot-track');
 let allCards = [];
 
 function buildTrack() {
   track.innerHTML = '';
   allCards = [];
-  // Fill with 3x repeated lots so we have plenty to scroll through
-  const looped = [...LOTS, ...LOTS, ...LOTS, ...LOTS];
-  looped.forEach((lot, i) => {
-    const card = document.createElement('div');
-    card.className = 'lot-card';
-    card.innerHTML = `
-      <div class="smoke smoke-1"></div>
-      <div class="smoke smoke-2"></div>
-      <div class="lot-icon">${lot.icon}</div>
-      <div class="lot-name">${lot.name}</div>
-    `;
-    track.appendChild(card);
-    allCards.push(card);
-  });
+  for (let s = 0; s < SETS; s++) {
+    LOTS.forEach((lot, i) => {
+      const card = document.createElement('div');
+      card.className = 'lot-card';
+      card.innerHTML = `
+        <div class="smoke smoke-1"></div>
+        <div class="smoke smoke-2"></div>
+        <div class="lot-icon">${lot.icon}</div>
+        <div class="lot-name">${lot.name}</div>`;
+      track.appendChild(card);
+      allCards.push(card);
+    });
+  }
 }
-
 buildTrack();
 
-const CARD_WIDTH = 276; // 260 + 16 gap
-const VIEWPORT_WIDTH = 950 - 24; // widget width minus padding
-const CENTER_OFFSET = VIEWPORT_WIDTH / 2 - CARD_WIDTH / 2;
+// Viewport: widget 500px, padding 10px each side → 480px usable
+const VIEWPORT_W = 480;
+const CENTER_OFFSET = VIEWPORT_W / 2 - CARD_W / 2; // offset so a card at index 0 is centered
 
-// Start position — show cards starting from beginning
-let currentX = 0;
-track.style.transform = `translateX(${CENTER_OFFSET}px)`;
+// Start showing set index 1 (so cards exist both before and after)
+const START_SET = 1;
+let currentTranslateX = CENTER_OFFSET - START_SET * LOTS.length * STEP;
+track.style.transform = `translateX(${currentTranslateX}px)`;
 
-// ===================== FALLING PETALS =====================
+// ===================== PETALS =====================
 function spawnPetals() {
-  const container = document.getElementById('petals-container');
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 14; i++) {
     const p = document.createElement('div');
     p.className = 'fall-petal';
-    p.style.left = Math.random() * 1280 + 'px';
-    p.style.animationDuration = (4 + Math.random() * 6) + 's';
-    p.style.animationDelay = (Math.random() * 8) + 's';
-    p.style.opacity = '0';
-    p.style.width = (4 + Math.random() * 5) + 'px';
-    p.style.height = (12 + Math.random() * 14) + 'px';
-    container.appendChild(p);
+    p.style.left   = Math.random() * 1280 + 'px';
+    p.style.width  = (3 + Math.random() * 4) + 'px';
+    p.style.height = (10 + Math.random() * 12) + 'px';
+    p.style.animationDuration = (5 + Math.random() * 7) + 's';
+    p.style.animationDelay   = (Math.random() * 10) + 's';
+    document.body.appendChild(p);
   }
 }
-spawnPetals();
 
-// ===================== STORYBOARD FRAMES =====================
-function buildStoryboardFrames() {
-  const frames = [
-    { stemH: 10 },
-    { stemH: 25 },
-    { stemH: 45 },
-    { stemH: 65, hasLeaf: true },
-    { stemH: 80, hasLeaf: true, hasHead: true },
-  ];
+// ===================== INTRO =====================
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  frames.forEach((f, i) => {
-    const el = document.getElementById('sb' + (i + 1));
-    el.innerHTML = `<svg width="50" height="${f.stemH + 5}" viewBox="0 0 50 ${f.stemH + 5}" xmlns="http://www.w3.org/2000/svg">
-      <line x1="25" y1="${f.stemH + 5}" x2="25" y2="0" stroke="#660000" stroke-width="2"/>
-      ${f.hasLeaf ? '<path d="M25,20 Q10,10 5,0" stroke="#440000" stroke-width="1.5" fill="none"/>' : ''}
-      ${f.hasHead ? '<circle cx="25" cy="0" r="5" fill="#cc0000" opacity="0.8"/>' : ''}
-    </svg>`;
-  });
-}
-buildStoryboardFrames();
-
-// ===================== INTRO SEQUENCE =====================
 async function runIntro() {
-  const sb = document.getElementById('storyboard');
   const lycoris = document.getElementById('lycoris-svg');
-  const stem = document.getElementById('stem');
-  const leaf1 = document.getElementById('leaf1');
-  const leaf2 = document.getElementById('leaf2');
-  const flowerHead = document.getElementById('flower-head');
-  const stamens = document.getElementById('stamens');
-  const petals = document.querySelectorAll('.petal-path');
-  const widget = document.getElementById('widget');
-
-  // 1. Show storyboard frames one by one
-  sb.style.opacity = '1';
-  const sbFrames = sb.querySelectorAll('.sb-frame');
-
-  for (let i = 0; i < sbFrames.length; i++) {
-    await new Promise(r => {
-      anime({
-        targets: sbFrames[i],
-        opacity: [0, 1],
-        translateY: [-10, 0],
-        duration: 200,
-        easing: 'easeOutQuad',
-        complete: r
-      });
-    });
-    await delay(120);
-  }
-
-  await delay(400);
-
-  // 2. Storyboard fades out
-  await new Promise(r => {
-    anime({ targets: sb, opacity: 0, duration: 400, easing: 'easeInQuad', complete: r });
-  });
-
-  // 3. Lycoris appears and grows
   lycoris.style.opacity = '1';
 
-  // Stem draws
-  await new Promise(r => {
-    anime({
-      targets: stem,
-      strokeDashoffset: [220, 0],
-      duration: 900,
-      easing: 'easeInOutQuad',
-      complete: r
-    });
-  });
+  await new Promise(r => anime({
+    targets: '#stem',
+    strokeDashoffset: [230, 0],
+    duration: 900, easing: 'easeInOutQuad', complete: r
+  }));
 
-  // Leaves appear
-  anime({ targets: leaf1, opacity: [0, 0.8], duration: 300, easing: 'easeOutQuad' });
-  await delay(100);
-  anime({ targets: leaf2, opacity: [0, 0.8], duration: 300, easing: 'easeOutQuad' });
+  anime({ targets: '#leaf1', opacity: [0, 0.85], duration: 280, easing: 'easeOutQuad' });
+  await delay(130);
+  anime({ targets: '#leaf2', opacity: [0, 0.85], duration: 280, easing: 'easeOutQuad' });
   await delay(300);
 
-  // Flower head appears
-  anime({ targets: flowerHead, opacity: [0, 1], duration: 200, easing: 'easeOutQuad' });
-  await delay(150);
+  anime({ targets: '#flower-head', opacity: [0, 1], duration: 200, easing: 'easeOutQuad' });
+  await delay(130);
 
-  // Stamens shoot out
-  anime({ targets: stamens, opacity: [0, 1], duration: 300, easing: 'easeOutBack' });
-  await delay(100);
+  anime({ targets: '#stamens', opacity: [0, 1], duration: 300, easing: 'easeOutBack' });
+  await delay(80);
 
-  // Petals unfurl one by one
-  for (let p of petals) {
-    anime({
-      targets: p,
-      opacity: [0, 1],
-      scale: [0.3, 1],
-      duration: 250,
-      easing: 'easeOutBack'
-    });
-    await delay(60);
+  for (const p of document.querySelectorAll('.petal-path')) {
+    anime({ targets: p, opacity: [0, 1], scale: [0.2, 1], duration: 220, easing: 'easeOutBack' });
+    await delay(55);
   }
 
-  await delay(500);
+  await delay(350);
 
-  // 4. Widget slides out from flower
-  await new Promise(r => {
-    anime({
-      targets: widget,
-      opacity: [0, 1],
-      scaleX: [0, 1],
-      duration: 700,
-      easing: 'easeOutExpo',
-      complete: r
-    });
-  });
+  await new Promise(r => anime({
+    targets: '#widget',
+    opacity:  [0, 1],
+    scaleX:   [0, 1],
+    duration: 600, easing: 'easeOutExpo', complete: r
+  }));
 
-  // Enable spin button
-  document.getElementById('spin-btn').disabled = false;
-  
-  // Start ambient petal animations
-  document.querySelectorAll('.fall-petal').forEach(p => {
-    p.style.opacity = '0.7';
-  });
+  spawnPetals();
 }
 
-function delay(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
-
-// ===================== SPIN LOGIC =====================
+// ===================== SPIN =====================
 let spinning = false;
 
-function startSpin() {
+function triggerSpin() {
   if (spinning) return;
   spinning = true;
 
-  const btn = document.getElementById('spin-btn');
-  btn.disabled = true;
-
-  const winnerText = document.getElementById('winner-text');
-  winnerText.classList.remove('show');
-
-  // Pick winner
-  const winnerIdx = Math.floor(Math.random() * LOTS.length);
-  const winner = LOTS[winnerIdx];
-
-  // Remove winner highlight from all cards
   allCards.forEach(c => c.classList.remove('winner'));
+  const wt = document.getElementById('winner-text');
+  wt.classList.remove('show');
 
-  // Calculate: spin many cards then land on winner
-  const totalCards = allCards.length;
-  const spinCards = 16 + Math.floor(Math.random() * 8); // how many cards to scroll through
-  const landIdx = winnerIdx + LOTS.length; // land in the middle repetition
+  const winnerIdx = Math.floor(Math.random() * LOTS.length);
 
-  const targetX = CENTER_OFFSET - (landIdx * CARD_WIDTH);
+  // Land somewhere in set 3 (index 2) for a good scroll distance
+  const landCardAbsolute = 2 * LOTS.length + winnerIdx;
+  const targetX = CENTER_OFFSET - landCardAbsolute * STEP;
 
-  // Ease: fast then slow
   anime({
     targets: track,
     translateX: targetX,
-    duration: 4200,
-    easing: 'cubicBezier(0.25, 0.1, 0.1, 1.0)',
-    update: function(anim) {
-      // Highlight center card during spin
-      const curX = anime.get(track, 'translateX');
-      const centerCard = Math.round((CENTER_OFFSET - Number(String(curX).replace('px',''))) / CARD_WIDTH);
-      allCards.forEach((c, i) => {
-        c.classList.toggle('winner', i === centerCard && anim.progress > 80);
-      });
-    },
-    complete: function() {
-      allCards.forEach(c => c.classList.remove('winner'));
-      allCards[landIdx].classList.add('winner');
+    duration: 4500,
+    easing: 'cubicBezier(0.12, 0.9, 0.2, 1.0)',
+    complete() {
+      currentTranslateX = targetX;
+      allCards[landCardAbsolute].classList.add('winner');
 
-      winnerText.textContent = `✦ ${winner.name} ✦`;
-      winnerText.classList.add('show');
+      wt.textContent = `✦ ${LOTS[winnerIdx].name} ✦`;
+      wt.classList.add('show');
 
-      // Flash effect
       anime({
-        targets: '#widget .widget-outer',
+        targets: '.widget-outer',
         boxShadow: [
-          '0 0 20px #ff000066, 0 0 60px #cc000033',
-          '0 0 60px #ff0000cc, 0 0 120px #cc000077',
-          '0 0 20px #ff000066, 0 0 60px #cc000033',
+          '0 0 16px #ff000055, 0 0 40px #cc000022, inset 0 0 20px #1a0000',
+          '0 0 55px #ff0000bb, 0 0 100px #cc000077, inset 0 0 20px #1a0000',
+          '0 0 16px #ff000055, 0 0 40px #cc000022, inset 0 0 20px #1a0000',
         ],
-        duration: 800,
-        easing: 'easeInOutQuad'
+        duration: 700, easing: 'easeInOutSine',
+        complete: () => { spinning = false; }
       });
-
-      spinning = false;
-      btn.disabled = false;
     }
   });
 }
 
-// ===================== START =====================
-window.addEventListener('load', () => {
-  document.getElementById('spin-btn').disabled = true;
-  runIntro();
-});
+window.triggerSpin = triggerSpin;
+
+// For demo: click anywhere to spin
+document.body.addEventListener('click', triggerSpin);
+
+window.addEventListener('load', runIntro);
 </script>
 </body>
 </html>
