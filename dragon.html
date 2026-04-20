@@ -1,750 +1,644 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>OBS Roulette</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: transparent;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      height: 100vh; overflow: hidden;
-      font-family: 'Poiret One', cursive;
-    }
+<meta charset="UTF-8">
+<title>Лента-рулетка | Ликорис</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
 
-    #stage {
-      position: relative;
-      width: 480px; height: 480px;
-      display: flex; align-items: center; justify-content: center;
-    }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    #lightningCanvas {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-      z-index: 1;
-      opacity: 0;
-    }
+  body {
+    background: #000;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    font-family: 'Cinzel', serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-    #morphSvg {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-      z-index: 2;
-      opacity: 0;
-    }
+  /* ===================== LYCORIS FLOWER ===================== */
+  #lycoris-wrap {
+    position: absolute;
+    left: 60px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 200px;
+    height: 400px;
+    z-index: 10;
+  }
 
-    #wheelCanvas {
-      position: absolute;
-      left: 30px; top: 30px;
-      width: 420px; height: 420px;
-      opacity: 0;
-      z-index: 3;
-    }
+  .lycoris-svg {
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+  }
 
-    .arrow-wrap {
-      position: absolute;
-      top: 8px; left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      filter: drop-shadow(0 4px 10px rgba(217,176,140,0.7));
-      opacity: 0;
-    }
-    .arrow-wrap svg { width: 32px; height: 48px; }
+  /* ===================== WIDGET ===================== */
+  #widget {
+    position: absolute;
+    left: 200px;
+    top: 50%;
+    transform: translateY(-50%) scaleX(0);
+    transform-origin: left center;
+    opacity: 0;
+    width: 950px;
+  }
 
-    #winnerOverlay {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      pointer-events: none;
-      z-index: 20;
-      opacity: 0;
-    }
-    #winnerSymbolWrap {
-      width: 200px; height: 200px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    #winnerSymbolSvg {
-      width: 100%; height: 100%;
-      overflow: visible;
-      transform: scale(0);
-    }
-    #winnerLotName {
-      color: #d9b08c;
-      font-family: 'Poiret One', cursive;
-      font-size: 32px;
-      text-align: center;
-      text-shadow: 0 0 24px rgba(217,176,140,0.9), 0 0 60px rgba(217,176,140,0.4);
-      letter-spacing: 4px;
-      margin-top: 16px;
-      opacity: 0;
-      transform: translateY(10px);
-      max-width: 400px;
-    }
+  .widget-outer {
+    position: relative;
+    background: #111;
+    border: 3px solid #cc0000;
+    box-shadow:
+      0 0 20px #ff000066,
+      0 0 60px #cc000033,
+      inset 0 0 30px #1a0000;
+    border-radius: 4px;
+    padding: 12px;
+  }
 
-    /* Scale label — TOP */
-    #scaleWrap {
-      position: absolute;
-      top: -52px; left: 50%;
-      transform: translateX(-50%);
-      opacity: 0;
-      white-space: nowrap;
-    }
-    #scaleWrap.visible { opacity: 1; }
-    #scaleLabel {
-      color: #d9b08c;
-      font-size: 22px;
-      font-family: 'Poiret One', cursive;
-      text-align: center;
-      letter-spacing: 3px;
-      text-shadow: 0 0 10px rgba(217,176,140,0.6);
-    }
-  </style>
+  /* Corner decorations */
+  .widget-outer::before,
+  .widget-outer::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-color: #ff2200;
+    border-style: solid;
+  }
+  .widget-outer::before {
+    top: -3px; left: -3px;
+    border-width: 3px 0 0 3px;
+  }
+  .widget-outer::after {
+    bottom: -3px; right: -3px;
+    border-width: 0 3px 3px 0;
+  }
+
+  /* ===================== SLOT TRACK ===================== */
+  .slot-viewport {
+    position: relative;
+    overflow: hidden;
+    height: 160px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Center highlight overlay */
+  .slot-viewport::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 290px;
+    height: 100%;
+    border: 2.5px solid #ff2200;
+    box-shadow: 0 0 18px #ff220088, inset 0 0 18px #ff220022;
+    z-index: 5;
+    pointer-events: none;
+    border-radius: 3px;
+  }
+
+  /* Side fade masks */
+  .slot-viewport::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to right,
+      #111 0%,
+      transparent 18%,
+      transparent 82%,
+      #111 100%
+    );
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  .slot-track {
+    display: flex;
+    gap: 16px;
+    will-change: transform;
+    padding: 0 8px;
+  }
+
+  /* ===================== LOT CARD ===================== */
+  .lot-card {
+    flex-shrink: 0;
+    width: 260px;
+    height: 140px;
+    background: #0d0d0d;
+    border: 2px solid #660000;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 3px;
+    transition: border-color 0.3s;
+  }
+
+  /* Card corner ornaments (SVG inline) */
+  .lot-card::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid #3a0000;
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  /* Cloud smoke decoration — CSS only */
+  .smoke {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, #2a000088 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .smoke-1 { width: 60px; height: 30px; bottom: 8px; left: 10px; opacity: 0.6; }
+  .smoke-2 { width: 40px; height: 20px; top: 12px; right: 14px; opacity: 0.4; }
+
+  .lot-icon {
+    font-size: 36px;
+    line-height: 1;
+  }
+
+  .lot-name {
+    color: #cc3333;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 0 12px;
+    text-shadow: 0 0 8px #ff000077;
+  }
+
+  .lot-card.winner {
+    border-color: #ff2200;
+    background: #1a0000;
+    box-shadow: 0 0 25px #ff220055, inset 0 0 20px #2a0000;
+  }
+
+  /* ===================== HEADER ===================== */
+  .widget-header {
+    text-align: center;
+    margin-bottom: 10px;
+    color: #cc0000;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px #ff0000aa;
+    opacity: 0.7;
+  }
+
+  /* ===================== WINNER DISPLAY ===================== */
+  #winner-display {
+    text-align: center;
+    margin-top: 10px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #winner-text {
+    color: #ff3300;
+    font-size: 16px;
+    letter-spacing: 0.25em;
+    text-shadow: 0 0 20px #ff0000, 0 0 40px #ff000066;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s, transform 0.6s;
+  }
+
+  #winner-text.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ===================== SPIN BUTTON ===================== */
+  #spin-btn {
+    display: block;
+    margin: 16px auto 4px;
+    padding: 10px 40px;
+    background: transparent;
+    border: 2px solid #cc0000;
+    color: #cc0000;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 0 10px #cc000044;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #spin-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #cc000000;
+    transition: background 0.3s;
+  }
+
+  #spin-btn:hover::before { background: #cc000022; }
+  #spin-btn:hover { box-shadow: 0 0 20px #cc000088; }
+  #spin-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* ===================== LYCORIS PETALS (CSS) ===================== */
+  .petal {
+    position: absolute;
+    transform-origin: bottom center;
+    opacity: 0;
+  }
+
+  /* Falling petals ambient */
+  .fall-petal {
+    position: absolute;
+    width: 6px;
+    height: 18px;
+    border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+    background: linear-gradient(180deg, #cc0000, #660000);
+    opacity: 0;
+    animation: fallPetal linear infinite;
+    top: -20px;
+  }
+
+  @keyframes fallPetal {
+    0% { transform: translateY(0) rotate(0deg) translateX(0); opacity: 0.7; }
+    100% { transform: translateY(750px) rotate(360deg) translateX(40px); opacity: 0; }
+  }
+
+  /* ===================== STORYBOARD FRAMES ===================== */
+  #storyboard {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .sb-frame {
+    width: 60px;
+    height: 70px;
+    border: 1.5px solid #550000;
+    background: #0a0000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .sb-frame svg {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+</style>
 </head>
 <body>
 
-<div id="stage">
-  <canvas id="lightningCanvas" width="480" height="480"></canvas>
+<!-- Falling petals ambient -->
+<div id="petals-container"></div>
 
-  <svg id="morphSvg" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <radialGradient id="hexGrad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#003032" stop-opacity="0.95"/>
-        <stop offset="60%" stop-color="#2c3531" stop-opacity="0.85"/>
-        <stop offset="100%" stop-color="#003032" stop-opacity="0.7"/>
-      </radialGradient>
-      <filter id="hexGlow">
-        <feGaussianBlur stdDeviation="8" result="blur"/>
-        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-    </defs>
-    <polygon id="morphPoly"
-      points="240,240 240,240 240,240 240,240 240,240 240,240"
-      fill="url(#hexGrad)"
-      stroke="#d9b08c"
-      stroke-width="3"
-      filter="url(#hexGlow)"
-    />
+<!-- Storyboard frames top (shown during lycoris growth) -->
+<div id="storyboard">
+  <div class="sb-frame" id="sb1"></div>
+  <div class="sb-frame" id="sb2"></div>
+  <div class="sb-frame" id="sb3"></div>
+  <div class="sb-frame" id="sb4"></div>
+  <div class="sb-frame" id="sb5"></div>
+</div>
+
+<!-- Lycoris flower -->
+<div id="lycoris-wrap">
+  <svg class="lycoris-svg" id="lycoris-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+    <!-- Stem -->
+    <path id="stem" d="M100 400 Q95 300 100 200" stroke="#660000" stroke-width="3" fill="none"
+          stroke-dasharray="220" stroke-dashoffset="220"/>
+    <!-- Leaves -->
+    <path id="leaf1" d="M98 300 Q70 280 60 260" stroke="#440000" stroke-width="2" fill="none" opacity="0"/>
+    <path id="leaf2" d="M102 270 Q130 250 140 230" stroke="#440000" stroke-width="2" fill="none" opacity="0"/>
+    <!-- Petals group — 6 petals radiating -->
+    <g id="flower-head" transform="translate(100,195)" opacity="0">
+      <!-- Stamens -->
+      <g id="stamens" opacity="0">
+        <line x1="0" y1="0" x2="-30" y2="-45" stroke="#cc0000" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="-15" y2="-50" stroke="#cc0000" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="5"  y2="-52" stroke="#cc0000" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="22" y2="-47" stroke="#cc0000" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="34" y2="-38" stroke="#cc0000" stroke-width="1.2"/>
+        <line x1="0" y1="0" x2="40" y2="-22" stroke="#cc0000" stroke-width="1.2"/>
+        <!-- Stamen tips -->
+        <circle cx="-30" cy="-45" r="2.5" fill="#ff2200"/>
+        <circle cx="-15" cy="-50" r="2.5" fill="#ff2200"/>
+        <circle cx="5"  cy="-52" r="2.5" fill="#ff2200"/>
+        <circle cx="22" cy="-47" r="2.5" fill="#ff2200"/>
+        <circle cx="34" cy="-38" r="2.5" fill="#ff2200"/>
+        <circle cx="40" cy="-22" r="2.5" fill="#ff2200"/>
+      </g>
+      <!-- Petals (6, curving outward like lycoris) -->
+      <path class="petal-path" d="M0,0 Q-50,-20 -55,-60 Q-30,-40 0,-10 Z" fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q-40,-50 -20,-80 Q-10,-50 0,-10 Z" fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q0,-60 30,-75 Q10,-45 0,-10 Z" fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q45,-40 55,-65 Q25,-35 0,-10 Z" fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q55,-5 50,-45 Q25,-15 0,-10 Z"  fill="#cc0000" opacity="0"/>
+      <path class="petal-path" d="M0,0 Q55,25 40,-20 Q20,-5 0,-10 Z"   fill="#cc0000" opacity="0"/>
+    </g>
   </svg>
+</div>
 
-  <canvas id="wheelCanvas" width="420" height="420"></canvas>
+<!-- Main widget -->
+<div id="widget">
+  <div class="widget-outer">
+    <div class="widget-header">— Рулетка лотов —</div>
 
-  <div class="arrow-wrap" id="arrowWrap">
-    <svg viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#2c3531"/>
-          <stop offset="40%" stop-color="#d9b08c"/>
-          <stop offset="100%" stop-color="#2c3531"/>
-        </linearGradient>
-      </defs>
-      <polygon points="16,48 0,4 32,4" fill="url(#arrowGrad)"/>
-      <rect x="5" y="0" width="22" height="8" rx="2" fill="url(#arrowGrad)" stroke="#2c3531" stroke-width="1"/>
-    </svg>
-  </div>
-
-  <div id="winnerOverlay">
-    <div id="winnerSymbolWrap">
-      <svg id="winnerSymbolSvg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="slot-viewport">
+      <div class="slot-track" id="slot-track"></div>
     </div>
-    <div id="winnerLotName"></div>
-  </div>
 
-  <div id="scaleWrap">
-    <div id="scaleLabel">Колесо 0/150</div>
+    <div id="winner-display">
+      <div id="winner-text"></div>
+    </div>
+
+    <button id="spin-btn" onclick="startSpin()">✦ Крутить ✦</button>
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
 <script>
-// ════════════════════════════════════════════
-// FIREBASE
-// ════════════════════════════════════════════
-const firebaseConfig = {
-  apiKey: "AIzaSyCw4Fr5SrDh67kHtflFSZm7EJ4T5o-neQs",
-  authDomain: "roulette-twitch-2c7a3.firebaseapp.com",
-  databaseURL: "https://roulette-twitch-2c7a3-default-rtdb.europe-west1.firebasedatabase.app/",
-  projectId: "roulette-twitch-2c7a3"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+// ===================== DATA =====================
+const LOTS = [
+  { name: 'Арт по вашему персонажу', icon: '🎨' },
+  { name: 'Озвучка персонажа', icon: '🎤' },
+  { name: 'Стрим по вашей игре', icon: '🎮' },
+  { name: 'Чат-команда', icon: '⚡' },
+  { name: 'Рисунок Ликориса', icon: '🌺' },
+  { name: 'Эмоут на канал', icon: '✨' },
+  { name: 'Особый лот', icon: '💀' },
+  { name: 'Сюрприз', icon: '🎁' },
+];
 
-// ════════════════════════════════════════════
-// PALETTE
-// ════════════════════════════════════════════
-const C_STROKE  = '#d9b08c'; // contours & symbols
-const C_SEC_A   = '#003032'; // sector fill A
-const C_SEC_B   = '#002628'; // sector fill B (slightly darker)
-const C_SEC_TOP = '#004a4e'; // highlighted top sector
-const C_GRAD    = '#2c3531'; // accent gradient color
+// ===================== TRACK SETUP =====================
+const track = document.getElementById('slot-track');
+let allCards = [];
 
-// ════════════════════════════════════════════
-// CATEGORIES
-// ════════════════════════════════════════════
-const CATS = ['circle','diamond','square','triangle','heart'];
-function getCat(i) { return CATS[i % CATS.length]; }
-
-// SVG symbol string, filled
-function symSVG(type, cx, cy, r, stroke, fill, sw) {
-  sw = sw||2; fill = fill||stroke;
-  switch(type) {
-    case 'circle':
-      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    case 'diamond': {
-      const p=`${cx},${cy-r} ${cx+r},${cy} ${cx},${cy+r} ${cx-r},${cy}`;
-      return `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    }
-    case 'square': {
-      const h=r*0.8;
-      return `<rect x="${cx-h}" y="${cy-h}" width="${h*2}" height="${h*2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    }
-    case 'triangle': {
-      const p=`${cx},${cy-r} ${cx+r*0.866},${cy+r*0.5} ${cx-r*0.866},${cy+r*0.5}`;
-      return `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    }
-    case 'heart': {
-      const s=r/60; const ox=cx-60*s; const oy=cy-55*s;
-      return `<path transform="translate(${ox},${oy}) scale(${s})" d="M60 100 C35 75,0 60,0 35 C0 15,15 0,35 0 C46 0,55 5,60 13 C65 5,74 0,85 0 C105 0,120 15,120 35 C120 60,85 75,60 100Z" fill="${fill}" stroke="${stroke}" stroke-width="${3/s}"/>`;
-    }
-  }
-  return '';
-}
-
-// ════════════════════════════════════════════
-// STATE
-// ════════════════════════════════════════════
-let options = [];
-let goal = 150;
-let currentAngle = 0;
-let isSpinning = false;
-let hideTimer = null;
-let spinQueue = [];
-let processingQueue = false;
-let lastTs = 0;
-
-const lCanvas = document.getElementById('lightningCanvas');
-const lCtx = lCanvas.getContext('2d');
-const morphSvg = document.getElementById('morphSvg');
-const morphPoly = document.getElementById('morphPoly');
-const wCanvas = document.getElementById('wheelCanvas');
-const wCtx = wCanvas.getContext('2d');
-const arrowWrap = document.getElementById('arrowWrap');
-const winnerOverlay = document.getElementById('winnerOverlay');
-const winnerSymbolSvg = document.getElementById('winnerSymbolSvg');
-const winnerLotName = document.getElementById('winnerLotName');
-const scaleWrap = document.getElementById('scaleWrap');
-const scaleLabel = document.getElementById('scaleLabel');
-
-// ════════════════════════════════════════════
-// FIREBASE LISTENERS
-// ════════════════════════════════════════════
-db.ref("options").on("value", snap => {
-  if (snap.val()) { options = snap.val(); drawWheel(currentAngle, -1); }
-});
-db.ref("goal").on("value", snap => { if (snap.val()) goal = snap.val(); });
-db.ref("donateTotal").on("value", snap => {
-  const total = snap.val() || 0;
-  scaleLabel.innerText = `Колесо ${total}/${goal}`;
-  scaleWrap.classList.add("visible");
-});
-db.ref("spinCommand").on("value", snap => {
-  const data = snap.val();
-  if (!data || data.ts === lastTs) return;
-  lastTs = data.ts;
-  const index = options.findIndex(o => o.label === data.label);
-  if (index !== -1) {
-    setTimeout(() => { spinQueue.push(index); processQueue(); }, isSpinning ? 0 : 10000);
-  }
-});
-
-// ════════════════════════════════════════════
-// HELPERS
-// ════════════════════════════════════════════
-function getArcs() {
-  const total = options.reduce((s,o)=>s+(o.weight||1),0);
-  return options.map(o=>((o.weight||1)/total)*Math.PI*2);
-}
-
-function lerp(a,b,t){return a+(b-a)*t;}
-function easeOut4(t){return 1-Math.pow(1-t,4);}
-function easeInOut3(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
-function easeOutBack(t){const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2);}
-
-function nGon(n, cx, cy, r, rot) {
-  const pts=[];
-  for(let i=0;i<n;i++){
-    const a=(i/n)*Math.PI*2+rot;
-    pts.push(`${cx+Math.cos(a)*r},${cy+Math.sin(a)*r}`);
-  }
-  return pts.join(' ');
-}
-
-// hex string to rgb
-function hexToRgb(hex) {
-  const r=parseInt(hex.slice(1,3),16);
-  const g=parseInt(hex.slice(3,5),16);
-  const b=parseInt(hex.slice(5,7),16);
-  return {r,g,b};
-}
-
-// ════════════════════════════════════════════
-// DRAW WHEEL
-// ════════════════════════════════════════════
-function getTopSectorIndex(angle) {
-  const arcs = getArcs();
-  const norm = (((-angle - Math.PI/2) % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
-  let acc = 0;
-  for (let i=0; i<arcs.length; i++) {
-    acc += arcs[i];
-    if (norm < acc) return i;
-  }
-  return 0;
-}
-
-function drawWheel(angle, revealUpTo) {
-  wCtx.clearRect(0,0,420,420);
-  if (!options.length) return;
-  const cx=210, cy=210, R=206;
-  const arcs=getArcs();
-  let start=angle;
-  const topIdx = getTopSectorIndex(angle);
-
-  // outer border ring with gradient glow
-  const borderGrad = wCtx.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
-  borderGrad.addColorStop(0, C_STROKE);
-  borderGrad.addColorStop(0.5, C_GRAD);
-  borderGrad.addColorStop(1, C_STROKE);
-  wCtx.beginPath();
-  wCtx.arc(cx,cy,R+4,0,Math.PI*2);
-  wCtx.strokeStyle = borderGrad;
-  wCtx.lineWidth=3;
-  wCtx.stroke();
-
-  for(let i=0;i<options.length;i++){
-    if(revealUpTo !== -1 && i > revealUpTo) { start+=arcs[i]; continue; }
-
-    const end = start+arcs[i];
-    const isTop = (i === topIdx) && revealUpTo === -1;
-
-    wCtx.beginPath();
-    wCtx.moveTo(cx,cy);
-    wCtx.arc(cx,cy,R,start,end);
-    wCtx.closePath();
-
-    if(isTop){
-      // Highlighted top sector — slightly lighter teal
-      const g=wCtx.createRadialGradient(cx,cy,0,cx,cy,R);
-      g.addColorStop(0,'#005a5e');
-      g.addColorStop(0.7, C_SEC_A);
-      g.addColorStop(1,'#002022');
-      wCtx.fillStyle=g;
-      wCtx.fill();
-      // golden tint overlay
-      wCtx.beginPath();
-      wCtx.moveTo(cx,cy);
-      wCtx.arc(cx,cy,R,start,end);
-      wCtx.closePath();
-      const rg=wCtx.createRadialGradient(cx,cy,0,cx,cy,R);
-      rg.addColorStop(0,'rgba(217,176,140,0.18)');
-      rg.addColorStop(0.6,'rgba(217,176,140,0.07)');
-      rg.addColorStop(1,'rgba(217,176,140,0.0)');
-      wCtx.fillStyle=rg;
-      wCtx.fill();
-    } else {
-      // Alternating dark teal shades with gradient mix
-      const shades = [C_SEC_A, C_SEC_B, '#002a2d', C_SEC_A];
-      const g = wCtx.createRadialGradient(cx,cy,0,cx,cy,R);
-      g.addColorStop(0, C_GRAD);
-      g.addColorStop(1, shades[i%shades.length]);
-      wCtx.fillStyle=g;
-      wCtx.fill();
-    }
-
-    // sector divider
-    wCtx.strokeStyle=C_STROKE;
-    wCtx.lineWidth=2;
-    wCtx.stroke();
-
-    // Symbol in sector — placed higher (sr = 0.60 of R instead of 0.68)
-    if(revealUpTo === -1 || i <= revealUpTo){
-      const mid=start+arcs[i]/2;
-      const sr=R*0.60;  // higher placement
-      const sx=cx+Math.cos(mid)*sr;
-      const sy=cy+Math.sin(mid)*sr;
-      const cat=getCat(i);
-      drawSymbolOnCanvas(wCtx, cat, sx, sy, 13, isTop ? C_STROKE : C_STROKE, isTop ? C_STROKE : C_STROKE, 2);
-    }
-
-    start=end;
-  }
-
-  // center cap
-  const capGrad = wCtx.createRadialGradient(cx,cy,0,cx,cy,18);
-  capGrad.addColorStop(0, C_GRAD);
-  capGrad.addColorStop(1, '#001618');
-  wCtx.beginPath();
-  wCtx.arc(cx,cy,16,0,Math.PI*2);
-  wCtx.fillStyle=capGrad;
-  wCtx.fill();
-  wCtx.strokeStyle=C_STROKE;
-  wCtx.lineWidth=2;
-  wCtx.stroke();
-}
-
-function drawSymbolOnCanvas(ctx, type, cx, cy, r, stroke, fill, sw) {
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = sw;
-  ctx.fillStyle = fill;
-  ctx.beginPath();
-  switch(type){
-    case 'circle':
-      ctx.arc(cx,cy,r,0,Math.PI*2);
-      ctx.fill();
-      ctx.stroke();
-      return;
-    case 'diamond':
-      ctx.moveTo(cx,cy-r);
-      ctx.lineTo(cx+r,cy);
-      ctx.lineTo(cx,cy+r);
-      ctx.lineTo(cx-r,cy);
-      ctx.closePath();
-      break;
-    case 'square': {
-      const h=r*0.8;
-      ctx.rect(cx-h,cy-h,h*2,h*2);
-      break;
-    }
-    case 'triangle':
-      ctx.moveTo(cx,cy-r);
-      ctx.lineTo(cx+r*0.866,cy+r*0.5);
-      ctx.lineTo(cx-r*0.866,cy+r*0.5);
-      ctx.closePath();
-      break;
-    case 'heart': {
-      const s=r/12;
-      ctx.save();
-      ctx.translate(cx,cy-r*0.1);
-      ctx.scale(s,s);
-      ctx.moveTo(0,0);
-      ctx.bezierCurveTo(-2,-4,-8,-4,-8,0);
-      ctx.bezierCurveTo(-8,4,0,8,0,12);
-      ctx.bezierCurveTo(0,8,8,4,8,0);
-      ctx.bezierCurveTo(8,-4,2,-4,0,0);
-      ctx.restore();
-      break;
-    }
-  }
-  ctx.fill();
-  ctx.stroke();
-}
-
-// ════════════════════════════════════════════
-// LIGHTNING (golden teal palette)
-// ════════════════════════════════════════════
-function drawLightning(ctx, x1,y1,x2,y2, alpha, branchDepth) {
-  const midX=(x1+x2)/2 + (Math.random()-0.5)*(Math.abs(x2-x1)+Math.abs(y2-y1))*0.4;
-  const midY=(y1+y2)/2 + (Math.random()-0.5)*(Math.abs(x2-x1)+Math.abs(y2-y1))*0.4;
-  ctx.beginPath();
-  ctx.moveTo(x1,y1);
-  ctx.lineTo(midX,midY);
-  ctx.lineTo(x2,y2);
-  ctx.strokeStyle=`rgba(217,176,140,${alpha})`;
-  ctx.lineWidth=branchDepth>0?1.5:0.8;
-  ctx.shadowColor='rgba(217,176,140,0.8)';
-  ctx.shadowBlur=branchDepth>0?12:6;
-  ctx.stroke();
-  ctx.shadowBlur=0;
-  if(branchDepth>0 && Math.random()<0.6){
-    const bx=midX+(Math.random()-0.5)*80;
-    const by=midY+(Math.random()-0.5)*80;
-    drawLightning(ctx,midX,midY,bx,by,alpha*0.6,branchDepth-1);
-  }
-}
-
-function runLightning(onDone) {
-  lCanvas.style.opacity='1';
-  const cx=240, cy=240;
-  let frame=0;
-  const totalFrames=40;
-  function tick() {
-    lCtx.clearRect(0,0,480,480);
-    const g=lCtx.createRadialGradient(cx,cy,0,cx,cy,80);
-    g.addColorStop(0,`rgba(0,48,50,${0.8*Math.sin(frame/totalFrames*Math.PI)})`);
-    g.addColorStop(0.5,`rgba(44,53,49,${0.5*Math.sin(frame/totalFrames*Math.PI)})`);
-    g.addColorStop(1,'rgba(0,48,50,0)');
-    lCtx.fillStyle=g;
-    lCtx.beginPath(); lCtx.arc(cx,cy,80,0,Math.PI*2); lCtx.fill();
-
-    const bolts=5+Math.floor(Math.random()*3);
-    for(let i=0;i<bolts;i++){
-      const angle=(i/bolts)*Math.PI*2;
-      const len=60+Math.random()*120;
-      const ex=cx+Math.cos(angle)*len;
-      const ey=cy+Math.sin(angle)*len;
-      const alpha=0.4+Math.random()*0.5;
-      drawLightning(lCtx,cx,cy,ex,ey,alpha,2);
-    }
-    frame++;
-    if(frame<totalFrames) requestAnimationFrame(tick);
-    else { lCanvas.style.opacity='0'; onDone(); }
-  }
-  requestAnimationFrame(tick);
-}
-
-// ════════════════════════════════════════════
-// HEX MORPH
-// ════════════════════════════════════════════
-function runHexMorph(onDone) {
-  morphSvg.style.opacity='1';
-  const cx=240, cy=240;
-  const start=performance.now();
-  const TARGET_R=210;
-
-  function tick(now){
-    const elapsed=now-start;
-    morphPoly.setAttribute('stroke-width', 2+2*Math.sin(elapsed/100));
-
-    if(elapsed<500){
-      const p=easeOutBack(elapsed/500);
-      morphPoly.setAttribute('points', nGon(6,cx,cy,TARGET_R*p,-Math.PI/2));
-      morphPoly.setAttribute('opacity',p);
-    } else if(elapsed<900){
-      morphPoly.setAttribute('points', nGon(6,cx,cy,TARGET_R,-Math.PI/2));
-      const pulse=0.8+0.2*Math.sin(elapsed/60);
-      morphPoly.setAttribute('opacity',pulse);
-    } else if(elapsed<1400){
-      const p=(elapsed-900)/500;
-      const e=easeInOut3(p);
-      const n=Math.round(lerp(6,64,e));
-      morphPoly.setAttribute('points', nGon(n,cx,cy,TARGET_R,-Math.PI/2));
-      morphPoly.setAttribute('opacity',1);
-    } else if(elapsed<1700){
-      const p=(elapsed-1400)/300;
-      morphPoly.setAttribute('opacity',1-p);
-      wCanvas.style.opacity=p;
-    }
-
-    if(elapsed<1700) requestAnimationFrame(tick);
-    else {
-      morphSvg.style.opacity='0';
-      wCanvas.style.opacity='1';
-      onDone();
-    }
-  }
-  requestAnimationFrame(tick);
-}
-
-// ════════════════════════════════════════════
-// SECTOR REVEAL
-// ════════════════════════════════════════════
-function revealSectors(onDone){
-  if(!options.length){ onDone(); return; }
-  const n=options.length;
-  const perSector=Math.min(150, 800/n);
-  let i=0;
-  function next(){
-    drawWheel(currentAngle, i);
-    i++;
-    if(i<n) setTimeout(next, perSector);
-    else setTimeout(()=>{ drawWheel(currentAngle,-1); onDone(); }, 200);
-  }
-  drawWheel(currentAngle,-1);
-  requestAnimationFrame(()=>{ drawWheel(currentAngle,0); setTimeout(next, perSector); });
-}
-
-// ════════════════════════════════════════════
-// FULL INTRO
-// ════════════════════════════════════════════
-function runIntro(onDone){
-  lCanvas.style.opacity='0';
-  morphSvg.style.opacity='0';
-  wCanvas.style.opacity='0';
-  arrowWrap.style.opacity='0';
-  drawWheel(currentAngle, -2);
-
-  runLightning(()=>{
-    runHexMorph(()=>{
-      arrowWrap.style.transition='opacity 0.3s';
-      arrowWrap.style.opacity='1';
-      revealSectors(()=>{ onDone(); });
-    });
+function buildTrack() {
+  track.innerHTML = '';
+  allCards = [];
+  // Fill with 3x repeated lots so we have plenty to scroll through
+  const looped = [...LOTS, ...LOTS, ...LOTS, ...LOTS];
+  looped.forEach((lot, i) => {
+    const card = document.createElement('div');
+    card.className = 'lot-card';
+    card.innerHTML = `
+      <div class="smoke smoke-1"></div>
+      <div class="smoke smoke-2"></div>
+      <div class="lot-icon">${lot.icon}</div>
+      <div class="lot-name">${lot.name}</div>
+    `;
+    track.appendChild(card);
+    allCards.push(card);
   });
 }
 
-// ════════════════════════════════════════════
-// SPIN
-// ════════════════════════════════════════════
-function spinTo(winIndex, onDone){
-  if(isSpinning) return;
-  isSpinning=true;
+buildTrack();
 
-  const arcs=getArcs();
-  let sectorStart=0;
-  for(let i=0;i<winIndex;i++) sectorStart+=arcs[i];
-  const sectorMid=sectorStart+arcs[winIndex]/2;
-  const target=(Math.PI/2)-sectorMid+Math.PI;
-  const norm=currentAngle%(Math.PI*2);
-  let diff=target-norm;
-  while(diff<0) diff+=Math.PI*2;
-  while(diff>Math.PI*2) diff-=Math.PI*2;
-  const extra=(6+Math.floor(Math.random()*3))*Math.PI*2;
-  const finalAngle=currentAngle+diff+extra;
-  const duration=5000;
-  const startTime=performance.now();
-  const startAngle=currentAngle;
+const CARD_WIDTH = 276; // 260 + 16 gap
+const VIEWPORT_WIDTH = 950 - 24; // widget width minus padding
+const CENTER_OFFSET = VIEWPORT_WIDTH / 2 - CARD_WIDTH / 2;
 
-  function frame(now){
-    const e=Math.min((now-startTime)/duration,1);
-    const ease=easeOut4(e);
-    currentAngle=startAngle+(finalAngle-startAngle)*ease;
-    drawWheel(currentAngle,-1);
-    if(e<1){ requestAnimationFrame(frame); }
-    else {
-      isSpinning=false;
-      db.ref("history").push({value:options[winIndex].label,time:Date.now()});
-      setTimeout(()=>{ showWinner(winIndex,onDone); },600);
-    }
+// Start position — show cards starting from beginning
+let currentX = 0;
+track.style.transform = `translateX(${CENTER_OFFSET}px)`;
+
+// ===================== FALLING PETALS =====================
+function spawnPetals() {
+  const container = document.getElementById('petals-container');
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement('div');
+    p.className = 'fall-petal';
+    p.style.left = Math.random() * 1280 + 'px';
+    p.style.animationDuration = (4 + Math.random() * 6) + 's';
+    p.style.animationDelay = (Math.random() * 8) + 's';
+    p.style.opacity = '0';
+    p.style.width = (4 + Math.random() * 5) + 'px';
+    p.style.height = (12 + Math.random() * 14) + 'px';
+    container.appendChild(p);
   }
-  requestAnimationFrame(frame);
 }
+spawnPetals();
 
-// ════════════════════════════════════════════
-// WINNER ZOOM
-// ════════════════════════════════════════════
-function showWinner(winIndex, onDone){
-  const label=options[winIndex].label;
-  const cat=getCat(winIndex);
-
-  const arcs=getArcs();
-  let sectorStart=0;
-  for(let i=0;i<winIndex;i++) sectorStart+=arcs[i];
-  const mid=currentAngle+sectorStart+arcs[winIndex]/2;
-  const sr=206*0.60;
-  const cx=210, cy=210;
-  const sx=cx+Math.cos(mid)*sr;
-  const sy=cy+Math.sin(mid)*sr;
-  const stageX=30+sx;
-  const stageY=30+sy;
-  const offX=stageX-240;
-  const offY=stageY-240;
-
-  winnerOverlay.style.opacity='1';
-  winnerLotName.style.opacity='0';
-  winnerLotName.style.transform='translateY(10px)';
-  winnerLotName.innerText=label;
-
-  const SYM_CX=100, SYM_CY=100, SYM_R=70;
-  winnerSymbolSvg.innerHTML=`
-    <defs>
-      <radialGradient id="wSymGrad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#d9b08c" stop-opacity="1"/>
-        <stop offset="100%" stop-color="#2c3531" stop-opacity="0.6"/>
-      </radialGradient>
-      <filter id="wglow" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="10" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-    </defs>
-    <g filter="url(#wglow)">
-      ${symSVG(cat,SYM_CX,SYM_CY,SYM_R,'#d9b08c','url(#wSymGrad)',3)}
-    </g>`;
-
-  const symEl=document.getElementById('winnerSymbolSvg');
-  const duration=900;
-  const startTime=performance.now();
-
-  function frame(now){
-    const t=Math.min((now-startTime)/duration,1);
-    const ease=easeOutBack(Math.min(t,1));
-    const eLinear=easeOut4(t);
-
-    wCanvas.style.transform=`scale(${1-eLinear*0.7})`;
-    wCanvas.style.opacity=1-eLinear;
-
-    const curX=lerp(offX,0,eLinear);
-    const curY=lerp(offY,0,eLinear);
-    const scale=lerp(0.05,1,ease);
-    symEl.style.transform=`translate(${curX}px,${curY}px) scale(${scale})`;
-    symEl.style.transformOrigin='100px 100px';
-
-    if(t<1) requestAnimationFrame(frame);
-    else {
-      winnerLotName.style.transition='opacity 0.5s, transform 0.5s';
-      winnerLotName.style.opacity='1';
-      winnerLotName.style.transform='translateY(0)';
-
-      let ph=0;
-      const pulse=setInterval(()=>{
-        ph+=0.15;
-        const sc=1+0.04*Math.sin(ph);
-        symEl.style.transform=`scale(${sc})`;
-        symEl.style.transformOrigin='100px 100px';
-      },30);
-
-      hideTimer=setTimeout(()=>{
-        clearInterval(pulse);
-        winnerOverlay.style.opacity='0';
-        wCanvas.style.transform='scale(1)';
-        wCanvas.style.opacity='0';
-        arrowWrap.style.opacity='0';
-        if(onDone) onDone();
-      },6000);
-    }
-  }
-  requestAnimationFrame(frame);
-}
-
-// ════════════════════════════════════════════
-// QUEUE
-// ════════════════════════════════════════════
-function processQueue(){
-  if(processingQueue||spinQueue.length===0) return;
-  processingQueue=true;
-  const index=spinQueue.shift();
-
-  wCanvas.style.transition='';
-  wCanvas.style.transform='scale(1)';
-  wCanvas.style.opacity='0';
-  winnerOverlay.style.opacity='0';
-  winnerLotName.style.opacity='0';
-  arrowWrap.style.opacity='0';
-  if(hideTimer){clearTimeout(hideTimer);hideTimer=null;}
-
-  runIntro(()=>{
-    spinTo(index,()=>{
-      processingQueue=false;
-      if(spinQueue.length>0) setTimeout(processQueue,1500);
-    });
-  });
-}
-
-// Init
-drawWheel(0,-2);
-
-/* ── DEV TEST ──
-setTimeout(()=>{
-  options=[
-    {label:'Арт стрим',weight:1},
-    {label:'Just Chatting',weight:1},
-    {label:'Инди хоррор',weight:1},
-    {label:'Minecraft',weight:1},
-    {label:'Valorant',weight:1},
-    {label:'Чтение донатов',weight:1},
-    {label:'Speedrun',weight:1},
-    {label:'Meme review',weight:1},
+// ===================== STORYBOARD FRAMES =====================
+function buildStoryboardFrames() {
+  const frames = [
+    { stemH: 10 },
+    { stemH: 25 },
+    { stemH: 45 },
+    { stemH: 65, hasLeaf: true },
+    { stemH: 80, hasLeaf: true, hasHead: true },
   ];
-  drawWheel(0,-1);
-  spinQueue.push(3);
-  processQueue();
-},300);
-*/
+
+  frames.forEach((f, i) => {
+    const el = document.getElementById('sb' + (i + 1));
+    el.innerHTML = `<svg width="50" height="${f.stemH + 5}" viewBox="0 0 50 ${f.stemH + 5}" xmlns="http://www.w3.org/2000/svg">
+      <line x1="25" y1="${f.stemH + 5}" x2="25" y2="0" stroke="#660000" stroke-width="2"/>
+      ${f.hasLeaf ? '<path d="M25,20 Q10,10 5,0" stroke="#440000" stroke-width="1.5" fill="none"/>' : ''}
+      ${f.hasHead ? '<circle cx="25" cy="0" r="5" fill="#cc0000" opacity="0.8"/>' : ''}
+    </svg>`;
+  });
+}
+buildStoryboardFrames();
+
+// ===================== INTRO SEQUENCE =====================
+async function runIntro() {
+  const sb = document.getElementById('storyboard');
+  const lycoris = document.getElementById('lycoris-svg');
+  const stem = document.getElementById('stem');
+  const leaf1 = document.getElementById('leaf1');
+  const leaf2 = document.getElementById('leaf2');
+  const flowerHead = document.getElementById('flower-head');
+  const stamens = document.getElementById('stamens');
+  const petals = document.querySelectorAll('.petal-path');
+  const widget = document.getElementById('widget');
+
+  // 1. Show storyboard frames one by one
+  sb.style.opacity = '1';
+  const sbFrames = sb.querySelectorAll('.sb-frame');
+
+  for (let i = 0; i < sbFrames.length; i++) {
+    await new Promise(r => {
+      anime({
+        targets: sbFrames[i],
+        opacity: [0, 1],
+        translateY: [-10, 0],
+        duration: 200,
+        easing: 'easeOutQuad',
+        complete: r
+      });
+    });
+    await delay(120);
+  }
+
+  await delay(400);
+
+  // 2. Storyboard fades out
+  await new Promise(r => {
+    anime({ targets: sb, opacity: 0, duration: 400, easing: 'easeInQuad', complete: r });
+  });
+
+  // 3. Lycoris appears and grows
+  lycoris.style.opacity = '1';
+
+  // Stem draws
+  await new Promise(r => {
+    anime({
+      targets: stem,
+      strokeDashoffset: [220, 0],
+      duration: 900,
+      easing: 'easeInOutQuad',
+      complete: r
+    });
+  });
+
+  // Leaves appear
+  anime({ targets: leaf1, opacity: [0, 0.8], duration: 300, easing: 'easeOutQuad' });
+  await delay(100);
+  anime({ targets: leaf2, opacity: [0, 0.8], duration: 300, easing: 'easeOutQuad' });
+  await delay(300);
+
+  // Flower head appears
+  anime({ targets: flowerHead, opacity: [0, 1], duration: 200, easing: 'easeOutQuad' });
+  await delay(150);
+
+  // Stamens shoot out
+  anime({ targets: stamens, opacity: [0, 1], duration: 300, easing: 'easeOutBack' });
+  await delay(100);
+
+  // Petals unfurl one by one
+  for (let p of petals) {
+    anime({
+      targets: p,
+      opacity: [0, 1],
+      scale: [0.3, 1],
+      duration: 250,
+      easing: 'easeOutBack'
+    });
+    await delay(60);
+  }
+
+  await delay(500);
+
+  // 4. Widget slides out from flower
+  await new Promise(r => {
+    anime({
+      targets: widget,
+      opacity: [0, 1],
+      scaleX: [0, 1],
+      duration: 700,
+      easing: 'easeOutExpo',
+      complete: r
+    });
+  });
+
+  // Enable spin button
+  document.getElementById('spin-btn').disabled = false;
+  
+  // Start ambient petal animations
+  document.querySelectorAll('.fall-petal').forEach(p => {
+    p.style.opacity = '0.7';
+  });
+}
+
+function delay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// ===================== SPIN LOGIC =====================
+let spinning = false;
+
+function startSpin() {
+  if (spinning) return;
+  spinning = true;
+
+  const btn = document.getElementById('spin-btn');
+  btn.disabled = true;
+
+  const winnerText = document.getElementById('winner-text');
+  winnerText.classList.remove('show');
+
+  // Pick winner
+  const winnerIdx = Math.floor(Math.random() * LOTS.length);
+  const winner = LOTS[winnerIdx];
+
+  // Remove winner highlight from all cards
+  allCards.forEach(c => c.classList.remove('winner'));
+
+  // Calculate: spin many cards then land on winner
+  const totalCards = allCards.length;
+  const spinCards = 16 + Math.floor(Math.random() * 8); // how many cards to scroll through
+  const landIdx = winnerIdx + LOTS.length; // land in the middle repetition
+
+  const targetX = CENTER_OFFSET - (landIdx * CARD_WIDTH);
+
+  // Ease: fast then slow
+  anime({
+    targets: track,
+    translateX: targetX,
+    duration: 4200,
+    easing: 'cubicBezier(0.25, 0.1, 0.1, 1.0)',
+    update: function(anim) {
+      // Highlight center card during spin
+      const curX = anime.get(track, 'translateX');
+      const centerCard = Math.round((CENTER_OFFSET - Number(String(curX).replace('px',''))) / CARD_WIDTH);
+      allCards.forEach((c, i) => {
+        c.classList.toggle('winner', i === centerCard && anim.progress > 80);
+      });
+    },
+    complete: function() {
+      allCards.forEach(c => c.classList.remove('winner'));
+      allCards[landIdx].classList.add('winner');
+
+      winnerText.textContent = `✦ ${winner.name} ✦`;
+      winnerText.classList.add('show');
+
+      // Flash effect
+      anime({
+        targets: '#widget .widget-outer',
+        boxShadow: [
+          '0 0 20px #ff000066, 0 0 60px #cc000033',
+          '0 0 60px #ff0000cc, 0 0 120px #cc000077',
+          '0 0 20px #ff000066, 0 0 60px #cc000033',
+        ],
+        duration: 800,
+        easing: 'easeInOutQuad'
+      });
+
+      spinning = false;
+      btn.disabled = false;
+    }
+  });
+}
+
+// ===================== START =====================
+window.addEventListener('load', () => {
+  document.getElementById('spin-btn').disabled = true;
+  runIntro();
+});
 </script>
 </body>
 </html>
